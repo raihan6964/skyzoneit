@@ -8,7 +8,7 @@ A full-stack platform where users complete app-review tasks, submit screenshots,
 | --- | --- |
 | Web app | Next.js 16 (App Router, Turbopack), Tailwind v4, shadcn/ui 4 (Base UI) |
 | Database | Supabase (Postgres, RLS, RPCs, Auth) |
-| AI reviews | Groq API (OpenAI-compatible, default `llama-3.3-70b-versatile`) |
+| AI reviews | Groq API (OpenAI-compatible, default `openai/gpt-oss-120b`) |
 | Screenshots | imgbb (via server-side `/api/upload` proxy — key never exposed) |
 | Verification | Python FastAPI service (`python-service/`, separate deploy) |
 | Sheets sync | Google Apps Script web app (`google-apps-script/Code.gs`) |
@@ -50,7 +50,7 @@ Copy `.env.example` → `.env.local` and fill in:
 ```
 NEXT_PUBLIC_SUPABASE_URL=      NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=     ADMIN_EMAIL=
-GROQ_API_KEY=                  GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_API_KEY=                  GROQ_MODEL=openai/gpt-oss-120b
 IMGBB_API_KEY=
 SHEETS_WEBHOOK_URL=            # /exec URL from Apps Script
 PYTHON_SERVICE_URL=            # e.g. https://your-python.vercel.app/verify
