@@ -78,7 +78,7 @@ pytest                # tests (env: VERIFY_URL, PYTHON_SERVICE_SECRET)
 1. Import repo → Vercel → Framework: Next.js.
 2. Add all env vars above.
 3. `PYTHON_SERVICE_URL` → your Python deployment's root URL (the app calls `/verify`).
-4. `vercel.json` schedules `GET /api/cron/verify` daily at **00:20 Asia/Dhaka** (Bearer `CRON_SECRET`). Vercel Hobby only allows one cron run per day — this schedule is Hobby-safe and the route backfills missed runs automatically (Dhaka-time catch-up). On Pro, switch to hourly (`15 * * * *`), or trigger it from an external scheduler (e.g. cron-job.org) with header `Authorization: Bearer <CRON_SECRET>`.
+4. `vercel.json` schedules `GET /api/cron/verify` daily at **00:20 Asia/Dhaka** (Bearer `CRON_SECRET`). Vercel Hobby only allows one cron run per day — the route runs every active app once per day and backfills missed days automatically. On Pro, switch to hourly (`15 * * * *`), or trigger it manually: `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>.vercel.app/api/cron/verify`.
 
 **Python service**
 1. New Vercel project with Root Directory = `python-service/`.
@@ -91,8 +91,8 @@ pytest                # tests (env: VERIFY_URL, PYTHON_SERVICE_SECRET)
 2. Deploy → New deployment → Web app → Execute as: **Me**, Access: **Anyone**.
 3. Copy the `/exec` URL → `SHEETS_WEBHOOK_URL`.
    Verify: `curl -X POST "$SHEETS_WEBHOOK_URL" -H "Content-Type: application/json" -d "{\"rows\":[]}"` → `{"ok":true,"appended":0}`.
-4. Columns: `Date | User ID | App Name | Reviewer Name | Gmail | Screenshot Link`.
-   Rows are always pushed pre-sorted (Date ASC → App Name ASC) so bulk approvals never interleave apps.
+4. Columns: `Date | User Name | App Name | Reviewer Name | Gmail | Screenshot Link` (the profile's display name, falling back to the Sky ID).
+   Rows are always pushed pre-sorted (Date ASC → App Name ASC) so bulk approvals never interleave apps; rows whose screenshot link already exists are skipped (dedupe).
 
 ## How it works
 
