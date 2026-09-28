@@ -57,7 +57,7 @@ export async function PATCH(
   ctx: RouteContext<"/api/admin/users/[id]">
 ) {
   return withApi(async () => {
-    await requireAdmin();
+    const { user } = await requireAdmin();
     const { id } = await ctx.params;
     const admin = createAdminClient();
     const body = await request.json();
@@ -97,9 +97,14 @@ export async function PATCH(
     }
 
     if (body.action === "role") {
-      const role = body.role === "admin" ? "admin" : "user";
+      if (id === user.id) {
+        throw new ApiError("You cannot change your own role");
+      }
+      if (body.role !== "admin" && body.role !== "user") {
+        throw new ApiError("Invalid role");
+      }
       const profile = unwrap(
-        await admin.rpc("admin_set_role", { p_user_id: id, p_role: role })
+        await admin.rpc("admin_set_role", { p_user_id: id, p_role: body.role })
       );
       return Response.json({ profile });
     }

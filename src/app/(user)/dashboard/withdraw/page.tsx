@@ -60,6 +60,10 @@ export default function WithdrawPage() {
   const methodValue = useWatch({ control, name: "method" });
 
   const onSubmit = async (values: WithdrawInput) => {
+    if (Number(values.amount) < minWithdrawal) {
+      toast.error(`Minimum withdrawal is ${formatTK(minWithdrawal)}`);
+      return;
+    }
     setSubmitting(true);
     try {
       await postJson("/api/user/withdrawals", {
@@ -160,7 +164,7 @@ export default function WithdrawPage() {
                   }
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue>{() => "bKash"}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="bkash">bKash</SelectItem>

@@ -4,20 +4,10 @@ import type { UserTask } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-function dhakaToday(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Dhaka",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-
 export async function GET() {
   return withApi(async () => {
     const { profile } = await requireUser();
     const admin = createAdminClient();
-    const today = dhakaToday();
 
     const { data: tasks, error } = await admin
       .from("tasks")
@@ -39,37 +29,31 @@ export async function GET() {
     }
 
     const taskIds = visible.map((task) => task.id);
-    const [{ data: todayRows, error: todayError }, { data: myRows, error: myError }] =
-      await Promise.all([
-        admin
-          .from("submissions")
-          .select("task_id, user_id")
-          .in("task_id", taskIds)
-          .eq("submitted_date", today),
-        admin
-          .from("submissions")
-          .select("task_id")
-          .in("task_id", taskIds)
-          .eq("user_id", profile.id),
-      ]);
+    const { data: counts, error: countError } = await admin.rpc(
+      "task_board_counts",
+      { p_task_ids: taskIds, p_user_id: profile.id }
+    );
+    if (countError) throw new Error(countError.message);
 
-    if (todayError) throw new Error(todayError.message);
-    if (myError) throw new Error(myError.message);
-
-    const todayCount = new Map<string, number>();
-    for (const row of todayRows ?? []) {
-      todayCount.set(row.task_id, (todayCount.get(row.task_id) ?? 0) + 1);
-    }
-
-    const myCount = new Map<string, number>();
-    for (const row of myRows ?? []) {
-      myCount.set(row.task_id, (myCount.get(row.task_id) ?? 0) + 1);
+    const countMap = new Map<
+      string,
+      { today_cnt: number; my_cnt: number }
+    >();
+    for (const row of (counts ?? []) as Array<{
+      task_id: string;
+      today_cnt: number;
+      my_cnt: number;
+    }>) {
+      countMap.set(row.task_id, {
+        today_cnt: Number(row.today_cnt),
+        my_cnt: Number(row.my_cnt),
+      });
     }
 
     const result: UserTask[] = visible.map((task) => ({
       ...task,
-      submitted_today: todayCount.get(task.id) ?? 0,
-      my_total: myCount.get(task.id) ?? 0,
+      submitted_today: countMap.get(task.id)?.today_cnt ?? 0,
+      my_total: countMap.get(task.id)?.my_cnt ?? 0,
     }));
 
     return Response.json({ tasks: result });

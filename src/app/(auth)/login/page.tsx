@@ -44,7 +44,11 @@ function LoginForm() {
 
     toast.success("Welcome back!");
     const next = searchParams.get("next");
-    router.replace(next && next.startsWith("/") ? next : "/dashboard");
+    const safeNext =
+      next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")
+        ? next
+        : "/dashboard";
+    router.replace(safeNext);
     router.refresh();
   };
 

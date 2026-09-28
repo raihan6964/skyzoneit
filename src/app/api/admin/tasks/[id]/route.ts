@@ -28,36 +28,40 @@ export async function PATCH(
       throw new ApiError("End time must be after start time");
     }
 
+    // Only touch keys that were actually sent: schema defaults
+    // (description/banner "" , reward 0, null dates) must never wipe
+    // existing columns on a partial update like a status toggle.
+    const has = (key: string) =>
+      Object.prototype.hasOwnProperty.call(body, key);
+
     const payload: Record<string, unknown> = {};
-    if (value.app_name !== undefined) payload.app_name = value.app_name;
-    if (value.app_link !== undefined) {
+    if (has("app_name")) payload.app_name = value.app_name;
+    if (has("app_link") && typeof value.app_link === "string") {
       payload.app_link = value.app_link;
       const extracted = extractPackageInfo(value.app_link);
       if (extracted) {
         payload.package_name = extracted.package_name;
         payload.platform = extracted.platform;
-      } else if (value.package_name !== undefined) {
-        payload.package_name = value.package_name;
       }
-    } else if (value.package_name !== undefined) {
+    }
+    if (!("package_name" in payload) && has("package_name")) {
       payload.package_name = value.package_name;
     }
-    if (value.platform !== undefined && payload.package_name === undefined)
+    if (!("platform" in payload) && has("platform")) {
       payload.platform = value.platform;
-    if (value.description !== undefined)
-      payload.description = value.description.trim() || null;
-    if (value.banner_url !== undefined)
-      payload.banner_url = value.banner_url.trim() || null;
-    if (value.reward !== undefined) payload.reward = value.reward;
-    if (value.daily_limit !== undefined) payload.daily_limit = value.daily_limit;
-    if (value.ai_prompt !== undefined) payload.ai_prompt = value.ai_prompt;
-    if (value.cron_time !== undefined) payload.cron_time = value.cron_time;
-    if (value.fail_action !== undefined) payload.fail_action = value.fail_action;
-    if (value.start_at !== undefined)
-      payload.start_at = fromDatetimeLocal(value.start_at ?? "");
-    if (value.end_at !== undefined)
-      payload.end_at = fromDatetimeLocal(value.end_at ?? "");
-    if (value.status !== undefined) payload.status = value.status;
+    }
+    if (has("description"))
+      payload.description = (value.description ?? "").trim() || null;
+    if (has("banner_url"))
+      payload.banner_url = (value.banner_url ?? "").trim() || null;
+    if (has("reward")) payload.reward = value.reward;
+    if (has("daily_limit")) payload.daily_limit = value.daily_limit;
+    if (has("ai_prompt")) payload.ai_prompt = value.ai_prompt;
+    if (has("cron_time")) payload.cron_time = value.cron_time;
+    if (has("fail_action")) payload.fail_action = value.fail_action;
+    if (has("start_at")) payload.start_at = fromDatetimeLocal(value.start_at ?? "");
+    if (has("end_at")) payload.end_at = fromDatetimeLocal(value.end_at ?? "");
+    if (has("status")) payload.status = value.status;
 
     if (Object.keys(payload).length === 0) {
       throw new ApiError("Nothing to update");

@@ -6,7 +6,7 @@ export function sortSheetRows(rows: SheetRow[]): SheetRow[] {
     const left = a.app_name.toLowerCase();
     const right = b.app_name.toLowerCase();
     if (left !== right) return left < right ? -1 : 1;
-    if (a.user_id !== b.user_id) return a.user_id < b.user_id ? -1 : 1;
+    if (a.user_name !== b.user_name) return a.user_name < b.user_name ? -1 : 1;
     return 0;
   });
 }
@@ -14,7 +14,7 @@ export function sortSheetRows(rows: SheetRow[]): SheetRow[] {
 export function toSheetMatrix(rows: SheetRow[]): string[][] {
   return sortSheetRows(rows).map((row) => [
     row.date,
-    row.user_id,
+    row.user_name,
     row.app_name,
     row.reviewer_name,
     row.gmail,

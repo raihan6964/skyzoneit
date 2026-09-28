@@ -18,17 +18,26 @@ export async function generateReviewText(
   try {
     const response = await client.chat.completions.create({
       model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
-      temperature: 0.95,
+      temperature: 0.85,
       max_tokens: 400,
       messages: [
         {
           role: "system",
-          content:
-            "You write unique, realistic mobile app store reviews in natural human style. Output ONLY the review text itself: no quotation marks, no headings, no labels, no explanations. Never repeat the same phrasing twice. Write in English, 2-6 sentences, mention concrete believable details.",
+          content: [
+            "You write app-store reviews for a mobile app marketing platform.",
+            "",
+            "Hard rules:",
+            "- The admin-provided instructions are ABSOLUTE. Follow them exactly: topic, tone, language, length, keywords, and any required phrases. If anything in your defaults conflicts with the instructions, the instructions win.",
+            "- Output ONLY the review text itself: no quotation marks, headings, labels, bullet points, prefixes, or explanations.",
+            "- Sound like a real human user: natural, specific, casual phrasing. Never mention AI, tests, tasks, or instructions.",
+            "- Match the language requested in the instructions (default English).",
+            "- Never repeat the same phrasing across generations; vary sentence structure each time.",
+            "- 1-6 sentences unless the instructions specify a different length.",
+          ].join("\n"),
         },
         {
           role: "user",
-          content: `App: ${appName}\n\nInstructions:\n${adminPrompt}`,
+          content: `App: ${appName}\n\nAdmin instructions (follow strictly):\n${adminPrompt}\n\nWrite the review now.`,
         },
       ],
     });

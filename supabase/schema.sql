@@ -462,6 +462,79 @@ end;
 $$;
 
 -- ----------------------------------------------------------------------------
+-- RPC: reverse submissions (approved/rejected -> pending, balance adjusted)
+-- ----------------------------------------------------------------------------
+
+create or replace function public.reverse_submissions(p_ids uuid[])
+returns setof public.submissions
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_old      record;
+  v_row      public.submissions%rowtype;
+  v_bal      numeric;
+  v_deducted numeric;
+begin
+  perform public.authorize_admin();
+
+  if coalesce(array_length(p_ids, 1), 0) = 0 then
+    return;
+  end if;
+
+  for v_old in
+    select id, status, reward, user_id
+    from public.submissions
+    where id = any (p_ids)
+      and status in ('approved', 'rejected')
+    for update
+  loop
+    update public.submissions s
+    set status = 'pending',
+        verified_at = null,
+        verified_by = null,
+        rejection_reason = null,
+        verify_attempted = true
+    where s.id = v_old.id
+      and s.status = v_old.status
+    returning s.* into v_row;
+
+    if not found then
+      continue;
+    end if;
+
+    if v_old.status = 'approved' and v_old.reward > 0 then
+      select balance into v_bal
+      from public.profiles
+      where id = v_old.user_id
+      for update;
+
+      if found and v_bal is not null then
+        v_deducted := least(v_old.reward, v_bal);
+
+        update public.profiles
+        set balance = v_bal - v_deducted
+        where id = v_old.user_id;
+
+        if v_deducted > 0 then
+          insert into public.balance_transactions (
+            user_id, type, amount, reason, ref_id, balance_after
+          )
+          values (
+            v_old.user_id, 'debit', v_deducted,
+            'submission_reversed', v_old.id::text, v_bal - v_deducted
+          );
+        end if;
+      end if;
+    end if;
+
+    return next v_row;
+  end loop;
+end;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- RPC: mark verification attempts (cron)
 -- ----------------------------------------------------------------------------
 
@@ -726,6 +799,28 @@ end;
 $$;
 
 -- ----------------------------------------------------------------------------
+-- RPC: task board counters (dashboard, one aggregate call)
+-- ----------------------------------------------------------------------------
+
+create or replace function public.task_board_counts(
+  p_task_ids uuid[],
+  p_user_id uuid
+)
+returns table (task_id uuid, today_cnt bigint, my_cnt bigint)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select s.task_id,
+         count(*) filter (where s.submitted_date = public.dhaka_today())::bigint,
+         count(*) filter (where s.user_id = p_user_id)::bigint
+  from public.submissions s
+  where s.task_id = any (p_task_ids)
+  group by s.task_id;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- RPC: CRM stats
 -- ----------------------------------------------------------------------------
 
@@ -767,6 +862,7 @@ revoke execute on function
   public.create_submission(uuid, text, text, text),
   public.approve_submissions(uuid[], text),
   public.reject_submissions(uuid[], text),
+  public.reverse_submissions(uuid[]),
   public.set_verify_attempted(uuid[]),
   public.mark_sheet_synced(uuid[]),
   public.request_withdrawal(text, numeric),
@@ -774,7 +870,8 @@ revoke execute on function
   public.admin_adjust_balance(uuid, numeric, text, text),
   public.admin_set_user_status(uuid, text),
   public.admin_set_role(uuid, text),
-  public.get_crm_stats()
+  public.get_crm_stats(),
+  public.task_board_counts(uuid[], uuid)
 from public, anon;
 
 grant execute on function
@@ -785,6 +882,7 @@ to authenticated;
 grant execute on function
   public.approve_submissions(uuid[], text),
   public.reject_submissions(uuid[], text),
+  public.reverse_submissions(uuid[]),
   public.set_verify_attempted(uuid[]),
   public.mark_sheet_synced(uuid[]),
   public.set_withdrawal_status(uuid, text),
@@ -792,6 +890,7 @@ grant execute on function
   public.admin_set_user_status(uuid, text),
   public.admin_set_role(uuid, text),
   public.get_crm_stats(),
+  public.task_board_counts(uuid[], uuid),
   public.is_admin(),
   public.jwt_role(),
   public.dhaka_today()

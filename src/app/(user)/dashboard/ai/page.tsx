@@ -95,7 +95,13 @@ export default function ReviewGeneratorPage() {
                 onValueChange={(value) => setTaskId(value ?? "")}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose an app..." />
+                  <SelectValue placeholder="Choose an app...">
+                    {(value) => {
+                      if (!value) return "Choose an app...";
+                      const task = tasks.find((item) => item.id === value);
+                      return task ? task.app_name : value;
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {tasks.length === 0 ? (

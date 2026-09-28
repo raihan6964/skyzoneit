@@ -101,7 +101,7 @@ async function verifyTask(
       rejected: 0,
       left_pending: submissions.length,
       scraped: 0,
-      responded: true,
+      responded: false,
       error: `verify service responded ${response.status}`,
     };
   }
@@ -179,11 +179,13 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  const due = (tasks ?? []).filter((task) => {
-    const [hour, minute] = task.cron_time.split(":").map(Number);
-    const dueAt = (hour || 0) * 60 + (minute || 0);
-    return clock.minutes >= dueAt && task.last_verify_date !== clock.date;
-  });
+  // Once per day per task, regardless of the configured cron time: the
+  // Hobby plan only allows one cron run per day (00:20 Asia/Dhaka), and
+  // verifyTask already skips same-day submissions, so every eligible
+  // backlog row is processed (missed days are backfilled automatically).
+  const due = (tasks ?? []).filter(
+    (task) => task.last_verify_date !== clock.date
+  );
 
   const summary: {
     run_date: string;
@@ -192,7 +194,7 @@ export async function GET(request: NextRequest) {
     approved: number;
     rejected: number;
     left_pending: number;
-    sheet_synced: number;
+    scraped: number;
     task_runs: Array<{
       app_name: string;
       approved: number;
@@ -211,7 +213,7 @@ export async function GET(request: NextRequest) {
     approved: 0,
     rejected: 0,
     left_pending: 0,
-    sheet_synced: 0,
+    scraped: 0,
     task_runs: [],
     backlog_sheet_synced: 0,
     errors: [],
@@ -223,6 +225,7 @@ export async function GET(request: NextRequest) {
       summary.approved += result.approved;
       summary.rejected += result.rejected;
       summary.left_pending += result.left_pending;
+      summary.scraped += result.scraped;
       summary.task_runs.push({
         app_name: task.app_name,
         approved: result.approved,
@@ -237,7 +240,8 @@ export async function GET(request: NextRequest) {
           .from("tasks")
           .update({ last_verify_date: clock.date })
           .eq("id", task.id);
-      } else if (result.error) {
+      }
+      if (result.error) {
         summary.errors.push(`${task.app_name}: ${result.error}`);
       }
     } catch (error) {

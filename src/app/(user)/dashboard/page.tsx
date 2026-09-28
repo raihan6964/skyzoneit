@@ -12,7 +12,7 @@ import type { UserTask } from "@/lib/types";
 export default function TasksPage() {
   const { data, error, isLoading, mutate } = useApi<{ tasks: UserTask[] }>(
     "/api/user/tasks",
-    { refreshInterval: 8000 }
+    { refreshInterval: 15000 }
   );
 
   return (

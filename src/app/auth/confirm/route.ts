@@ -11,7 +11,11 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       const safeNext =
-        next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+        next.startsWith("/") &&
+        !next.startsWith("//") &&
+        !next.startsWith("/\\")
+          ? next
+          : "/dashboard";
       return NextResponse.redirect(`${origin}${safeNext}`);
     }
   }

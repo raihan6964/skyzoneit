@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { after } from "next/server";
 import { withApi, requireAdmin } from "@/lib/api";
 import { ApiError } from "@/lib/error";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -33,15 +34,31 @@ export async function PATCH(
       if (error) throw new ApiError(error.message);
       affected = (data ?? []) as Submission[];
       if (affected.length > 0) {
-        await syncApprovedToSheet(admin, affected.map((row) => row.id));
+        const ids = affected.map((row) => row.id);
+        after(async () => {
+          const result = await syncApprovedToSheet(admin, ids);
+          if (result.error) console.error("[sheet-sync]", result.error);
+        });
       }
-    } else {
+    } else if (parsed.data.action === "reject") {
       const { data, error } = await admin.rpc("reject_submissions", {
         p_ids: [id],
         p_reason: parsed.data.reason || null,
       });
       if (error) throw new ApiError(error.message);
       affected = (data ?? []) as Submission[];
+    } else {
+      const { data, error } = await admin.rpc("reverse_submissions", {
+        p_ids: [id],
+      });
+      if (error) throw new ApiError(error.message);
+      affected = (data ?? []) as Submission[];
+      if (affected.length === 0) {
+        throw new ApiError(
+          "Only approved or rejected submissions can be reversed",
+          409
+        );
+      }
     }
 
     if (affected.length === 0) {

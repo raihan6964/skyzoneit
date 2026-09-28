@@ -104,7 +104,7 @@ export interface UserTask extends Task {
 
 export interface SheetRow {
   date: string;
-  user_id: string;
+  user_name: string;
   app_name: string;
   reviewer_name: string;
   gmail: string;

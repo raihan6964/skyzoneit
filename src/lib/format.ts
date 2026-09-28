@@ -50,17 +50,30 @@ export function formatTimeRange(start: string | null, end: string | null): strin
   return left || right || "Always active";
 }
 
+const DHIKANA_TZ = "Asia/Dhaka";
+
 export function toDatetimeLocal(iso: string | null): string {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: DHIKANA_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 
 export function fromDatetimeLocal(value: string): string | null {
   if (!value) return null;
-  const date = new Date(value);
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value);
+  const date = new Date(hasZone ? value : `${value}:00+06:00`);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString();
 }

@@ -40,6 +40,9 @@ export async function GET() {
 
     if (statsResult.error) throw new Error(statsResult.error.message);
     if (chartResult.error) throw new Error(chartResult.error.message);
+    if (recentResult.error) {
+      console.error("[stats:recent]", recentResult.error.message);
+    }
 
     const days = new Map<
       string,

@@ -39,7 +39,7 @@ export const withdrawSchema = z.object({
     .regex(/^01[3-9]\d{8}$/, "Enter a valid bKash number (01XXXXXXXXX)"),
   amount: z.coerce
     .number({ error: "Enter an amount" })
-    .min(50, "Minimum withdrawal is 50 TK"),
+    .positive("Enter an amount"),
 });
 
 export const generateReviewSchema = z.object({
@@ -104,12 +104,12 @@ export const adminStatusSchema = z.object({
 
 export const bulkActionSchema = z.object({
   ids: z.array(z.uuid()).min(1, "Select at least one submission"),
-  action: z.enum(["approve", "reject"]),
+  action: z.enum(["approve", "reject", "reverse"]),
   reason: z.string().trim().max(200).optional().default(""),
 });
 
 export const singleActionSchema = z.object({
-  action: z.enum(["approve", "reject"]),
+  action: z.enum(["approve", "reject", "reverse"]),
   reason: z.string().trim().max(200).optional().default(""),
 });
 

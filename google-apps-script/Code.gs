@@ -9,12 +9,14 @@
  * 4. Copy the /exec URL into SHEETS_WEBHOOK_URL in the Next.js .env
  *
  * The Next.js backend ALWAYS sends rows pre-sorted:
- *   Date ASC -> App Name ASC (-> User ID)
- * so bulk approvals never interleave apps inside the same date block.
+ *   Date ASC -> App Name ASC (-> User Name)
+ * Rows whose Screenshot Link already exists in the sheet are skipped
+ * (dedupe), so retries and re-approvals never create duplicates.
  */
 
 var SHEET_NAME = 'Approved Reviews';
-var HEADERS = ['Date', 'User ID', 'App Name', 'Reviewer Name', 'Gmail', 'Screenshot Link'];
+var HEADERS = ['Date', 'User Name', 'App Name', 'Reviewer Name', 'Gmail', 'Screenshot Link'];
+var LINK_COLUMN = 6;
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
@@ -29,14 +31,25 @@ function doPost(e) {
     }
 
     var sheet = getSheet();
-    var lastRow = sheet.getLastRow();
+    ensureHeader(sheet);
 
-    if (lastRow === 0) {
-      sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
-      sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
-      lastRow = 1;
+    var lastRow = sheet.getLastRow();
+    var seen = {};
+    if (lastRow >= 2) {
+      var links = sheet.getRange(2, LINK_COLUMN, lastRow - 1, 1).getValues();
+      for (var i = 0; i < links.length; i++) {
+        if (links[i][0]) seen[String(links[i][0])] = true;
+      }
+      rows = rows.filter(function (row) {
+        return row[LINK_COLUMN - 1] && !seen[String(row[LINK_COLUMN - 1])];
+      });
     }
 
+    if (rows.length === 0) {
+      return json({ ok: true, appended: 0, deduped: true });
+    }
+
+    lastRow = sheet.getLastRow();
     sheet.getRange(lastRow + 1, 1, rows.length, HEADERS.length).setValues(rows);
     sheet.getRange(lastRow + 1, 1, rows.length, 1).setNumberFormat('yyyy-mm-dd');
 
@@ -49,7 +62,7 @@ function doPost(e) {
 }
 
 function doGet() {
-  return json({ ok: true, service: 'skyzone-it-sheet-sync' });
+  return json({ ok: true, service: 'skyzone-it-sheet-sync', version: 2 });
 }
 
 function getSheet() {
@@ -59,6 +72,27 @@ function getSheet() {
     sheet = spreadsheet.insertSheet(SHEET_NAME);
   }
   return sheet;
+}
+
+function ensureHeader(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow === 0) {
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
+    return;
+  }
+  var current = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
+  var mismatch = false;
+  for (var i = 0; i < HEADERS.length; i++) {
+    if (String(current[i]) !== HEADERS[i]) {
+      mismatch = true;
+      break;
+    }
+  }
+  if (mismatch) {
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
+  }
 }
 
 function json(obj, status) {

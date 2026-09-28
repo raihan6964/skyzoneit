@@ -197,7 +197,7 @@ export function TaskDialog({
           </DialogTitle>
           <DialogDescription>
             Workers see these details on their task board. Auto-verification
-            runs daily at the cron time you pick.
+            runs once per day (00:20 Asia/Dhaka) for all apps.
           </DialogDescription>
         </DialogHeader>
 
@@ -403,7 +403,9 @@ export function TaskDialog({
               <Label htmlFor="task-cron">Cron time</Label>
               <Input id="task-cron" type="time" {...register("cron_time")} />
               <p className="text-xs text-muted-foreground">
-                When auto-verification runs each day (Asia/Dhaka)
+                Preferred daily run time (Asia/Dhaka). On the current plan the
+                platform cron runs at 00:20 and processes every app once per
+                day.
               </p>
               {errors.cron_time && (
                 <p className="text-xs text-destructive">

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { mutate } from "swr";
 import {
   Check,
   ClipboardCheck,
+  ListChecks,
   Loader2,
   RefreshCw,
   Search,
+  Undo2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -69,10 +70,14 @@ export default function AdminSubmissionsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMode, setBulkMode] = useState(false);
   const [shot, setShot] = useState<{ url: string; caption: string } | null>(
     null
   );
   const [rejectState, setRejectState] = useState<
+    { ids: string[]; bulk: boolean } | null
+  >(null);
+  const [reverseState, setReverseState] = useState<
     { ids: string[]; bulk: boolean } | null
   >(null);
   const [bulkApproveOpen, setBulkApproveOpen] = useState(false);
@@ -119,7 +124,13 @@ export default function AdminSubmissionsPage() {
 
   const refreshAll = () => {
     void refresh();
-    void mutate(() => true);
+  };
+
+  const toggleBulkMode = () => {
+    setBulkMode((prev) => {
+      if (prev) resetSelection();
+      return !prev;
+    });
   };
 
   const rows = data?.submissions ?? [];
@@ -145,6 +156,7 @@ export default function AdminSubmissionsPage() {
       toast.warning("This submission was already processed");
       setSelected(new Set());
       setRejectState(null);
+      setReverseState(null);
       setBulkApproveOpen(false);
       refreshAll();
       return;
@@ -154,7 +166,7 @@ export default function AdminSubmissionsPage() {
 
   const runSingle = async (
     id: string,
-    action: "approve" | "reject",
+    action: "approve" | "reject" | "reverse",
     rejectionReason?: string
   ) => {
     setBusyId(id);
@@ -167,17 +179,20 @@ export default function AdminSubmissionsPage() {
         },
         "PATCH"
       );
-      toast.success(
-        action === "approve"
-          ? "Submission approved"
-          : "Submission rejected"
-      );
+      if (action === "approve") {
+        toast.success("Submission approved");
+      } else if (action === "reject") {
+        toast.success("Submission rejected");
+      } else {
+        toast.success("Submission reversed to pending");
+      }
       setSelected((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
       setRejectState(null);
+      setReverseState(null);
       refreshAll();
     } catch (err) {
       handleActionError(err);
@@ -186,7 +201,7 @@ export default function AdminSubmissionsPage() {
     }
   };
 
-  const runBulk = async (action: "approve" | "reject") => {
+  const runBulk = async (action: "approve" | "reject" | "reverse") => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
     setBulkBusy(true);
@@ -194,7 +209,6 @@ export default function AdminSubmissionsPage() {
       const result = await postJson<{
         processed: number;
         skipped: number;
-        sheet_synced: number;
       }>("/api/admin/submissions/bulk", {
         ids,
         action,
@@ -204,17 +218,24 @@ export default function AdminSubmissionsPage() {
       });
       if (action === "approve") {
         toast.success(
-          `Approved ${result.processed} submissions, synced ${result.sheet_synced} to sheet`
+          `Approved ${result.processed} submissions — syncing to sheet`
         );
-      } else {
+      } else if (action === "reject") {
         toast.success(
           result.skipped > 0
             ? `Rejected ${result.processed} submissions, ${result.skipped} skipped`
             : `Rejected ${result.processed} submissions`
         );
+      } else {
+        toast.success(
+          result.skipped > 0
+            ? `Reversed ${result.processed} submissions, ${result.skipped} skipped`
+            : `Reversed ${result.processed} submissions`
+        );
       }
       setSelected(new Set());
       setRejectState(null);
+      setReverseState(null);
       setBulkApproveOpen(false);
       setReason("");
       refreshAll();
@@ -228,6 +249,10 @@ export default function AdminSubmissionsPage() {
   const openReject = (ids: string[], bulk: boolean) => {
     setReason("");
     setRejectState({ ids, bulk });
+  };
+
+  const openReverse = (ids: string[], bulk: boolean) => {
+    setReverseState({ ids, bulk });
   };
 
   const rejectBusy = bulkBusy || busyId !== null;
@@ -244,15 +269,26 @@ export default function AdminSubmissionsPage() {
             Review screenshots, approve rewards and sync them to the sheet
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={refreshAll}
-          disabled={isValidating}
-        >
-          {isValidating ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={bulkMode ? "default" : "outline"}
+            size="sm"
+            onClick={toggleBulkMode}
+            aria-pressed={bulkMode}
+          >
+            <ListChecks />
+            Bulk actions
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshAll}
+            disabled={isValidating}
+          >
+            {isValidating ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -330,6 +366,14 @@ export default function AdminSubmissionsPage() {
         </div>
       </div>
 
+      {bulkMode && selected.size === 0 && (
+        <div className="flex items-center gap-2 rounded-xl border border-dashed bg-muted/30 p-3 text-sm text-muted-foreground">
+          <ListChecks className="size-4" />
+          Bulk mode is on — tick the checkboxes to select reviews, then approve,
+          reject or reverse them together.
+        </div>
+      )}
+
       {selected.size > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-medium">
@@ -355,6 +399,15 @@ export default function AdminSubmissionsPage() {
             </Button>
             <Button
               size="sm"
+              variant="outline"
+              disabled={bulkBusy}
+              onClick={() => openReverse(Array.from(selected), true)}
+            >
+              <Undo2 />
+              Reverse
+            </Button>
+            <Button
+              size="sm"
               variant="ghost"
               disabled={bulkBusy}
               onClick={() => setSelected(new Set())}
@@ -369,14 +422,16 @@ export default function AdminSubmissionsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={(checked) => toggleAll(checked)}
-                  aria-label="Select all rows on this page"
-                  disabled={rows.length === 0}
-                />
-              </TableHead>
+              {bulkMode && (
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={(checked) => toggleAll(checked)}
+                    aria-label="Select all rows on this page"
+                    disabled={rows.length === 0}
+                  />
+                </TableHead>
+              )}
               <TableHead>User</TableHead>
               <TableHead>App</TableHead>
               <TableHead className="hidden md:table-cell">Reviewer</TableHead>
@@ -391,16 +446,21 @@ export default function AdminSubmissionsPage() {
             {isLoading && !data ? (
               Array.from({ length: 8 }).map((_, rowIndex) => (
                 <TableRow key={rowIndex}>
-                  {Array.from({ length: 9 }).map((__, cellIndex) => (
-                    <TableCell key={cellIndex}>
-                      <Skeleton className="h-4 w-20" />
-                    </TableCell>
-                  ))}
+                  {Array.from({ length: bulkMode ? 9 : 8 }).map(
+                    (__, cellIndex) => (
+                      <TableCell key={cellIndex}>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
+                    )
+                  )}
                 </TableRow>
               ))
             ) : error && !data ? (
               <TableRow>
-                <TableCell colSpan={9} className="whitespace-normal">
+                <TableCell
+                  colSpan={bulkMode ? 9 : 8}
+                  className="whitespace-normal"
+                >
                   <EmptyState
                     icon={ClipboardCheck}
                     title="Could not load submissions"
@@ -410,7 +470,10 @@ export default function AdminSubmissionsPage() {
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="whitespace-normal">
+                <TableCell
+                  colSpan={bulkMode ? 9 : 8}
+                  className="whitespace-normal"
+                >
                   <EmptyState
                     icon={ClipboardCheck}
                     title="No submissions found"
@@ -421,13 +484,17 @@ export default function AdminSubmissionsPage() {
             ) : (
               rows.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selected.has(row.id)}
-                      onCheckedChange={(checked) => toggleRow(row.id, checked)}
-                      aria-label={`Select submission from ${row.reviewer_name}`}
-                    />
-                  </TableCell>
+                  {bulkMode && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selected.has(row.id)}
+                        onCheckedChange={(checked) =>
+                          toggleRow(row.id, checked)
+                        }
+                        aria-label={`Select submission from ${row.reviewer_name}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <p className="font-mono text-xs font-medium">
                       {row.profile?.sky_id ?? "—"}
@@ -511,9 +578,27 @@ export default function AdminSubmissionsPage() {
                         </Button>
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground">
-                        Processed
-                      </span>
+                      <div className="flex items-center justify-end">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={busyId === row.id}
+                          className="text-amber-600 dark:text-amber-400"
+                          onClick={() => openReverse([row.id], false)}
+                          title={
+                            row.status === "approved"
+                              ? "Move back to pending and deduct the reward"
+                              : "Move back to pending"
+                          }
+                        >
+                          {busyId === row.id ? (
+                            <Loader2 className="animate-spin" />
+                          ) : (
+                            <Undo2 />
+                          )}
+                          Reverse
+                        </Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
@@ -554,7 +639,7 @@ export default function AdminSubmissionsPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Rewards are credited to each worker and the rows are synced to
-              the Google Sheet. This cannot be undone.
+              the Google Sheet. You can reverse this later from this page.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -609,6 +694,45 @@ export default function AdminSubmissionsPage() {
             >
               {rejectBusy ? <Loader2 className="animate-spin" /> : null}
               Reject
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={reverseState !== null}
+        onOpenChange={(open) => {
+          if (!open && !rejectBusy) setReverseState(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {reverseState?.bulk
+                ? `Reverse ${reverseState.ids.length} submissions?`
+                : "Reverse this submission?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Each selected submission moves back to Pending. Approved
+              submissions also have their reward deducted from the worker&apos;s
+              balance (up to the available amount). Rejected submissions are
+              simply reopened. You can approve or reject them again afterwards.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={rejectBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={rejectBusy}
+              onClick={() => {
+                if (!reverseState) return;
+                if (reverseState.bulk) {
+                  void runBulk("reverse");
+                } else {
+                  void runSingle(reverseState.ids[0], "reverse");
+                }
+              }}
+            >
+              {rejectBusy ? <Loader2 className="animate-spin" /> : null}
+              Reverse
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { after } from "next/server";
 import { withApi, requireAdmin } from "@/lib/api";
 import { ApiError } from "@/lib/error";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -21,7 +22,6 @@ export async function POST(request: NextRequest) {
 
     const { ids, action, reason } = parsed.data;
     let affected: Submission[] = [];
-    let sheetSynced = 0;
 
     if (action === "approve") {
       const { data, error } = await admin.rpc("approve_submissions", {
@@ -31,16 +31,22 @@ export async function POST(request: NextRequest) {
       if (error) throw new ApiError(error.message);
       affected = (data ?? []) as Submission[];
       if (affected.length > 0) {
-        const sync = await syncApprovedToSheet(
-          admin,
-          affected.map((row) => row.id)
-        );
-        sheetSynced = sync.synced;
+        const syncIds = affected.map((row) => row.id);
+        after(async () => {
+          const result = await syncApprovedToSheet(admin, syncIds);
+          if (result.error) console.error("[sheet-sync]", result.error);
+        });
       }
-    } else {
+    } else if (action === "reject") {
       const { data, error } = await admin.rpc("reject_submissions", {
         p_ids: ids,
         p_reason: reason || null,
+      });
+      if (error) throw new ApiError(error.message);
+      affected = (data ?? []) as Submission[];
+    } else {
+      const { data, error } = await admin.rpc("reverse_submissions", {
+        p_ids: ids,
       });
       if (error) throw new ApiError(error.message);
       affected = (data ?? []) as Submission[];
@@ -49,7 +55,6 @@ export async function POST(request: NextRequest) {
     return Response.json({
       processed: affected.length,
       skipped: ids.length - affected.length,
-      sheet_synced: sheetSynced,
     });
   });
 }
