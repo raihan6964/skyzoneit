@@ -61,27 +61,33 @@ const optionalDateTime = z.preprocess(
   z.string().nullable()
 );
 
-export const taskFormSchema = z
-  .object({
-    app_name: z.string().trim().min(1, "App name is required").max(80),
-    app_link: z.url("Enter a valid store URL"),
-    package_name: z.string().trim().min(1, "Package name is required"),
-    platform: z.enum(["android", "ios"]),
-    description: z.string().trim().max(500).optional().default(""),
-    banner_url: z.string().trim().max(500).optional().default(""),
-    reward: nonNegativeNumber,
-    daily_limit: optionalPositiveInt,
-    ai_prompt: z.string().trim().min(1, "AI prompt is required").max(4000),
-    cron_time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a time (e.g. 21:00)"),
-    fail_action: z.enum(["pending", "rejected"]),
-    start_at: optionalDateTime,
-    end_at: optionalDateTime,
-    status: z.enum(["active", "inactive"]),
-  })
-  .refine((data) => !data.start_at || !data.end_at || new Date(data.end_at) > new Date(data.start_at), {
-    message: "End time must be after start time",
-    path: ["end_at"],
-  });
+export function endAfterStart(data: { start_at?: string | null; end_at?: string | null }) {
+  return !data.start_at || !data.end_at || new Date(data.end_at) > new Date(data.start_at);
+}
+
+const taskFormObject = z.object({
+  app_name: z.string().trim().min(1, "App name is required").max(80),
+  app_link: z.url("Enter a valid store URL"),
+  package_name: z.string().trim().min(1, "Package name is required"),
+  platform: z.enum(["android", "ios"]),
+  description: z.string().trim().max(500).optional().default(""),
+  banner_url: z.string().trim().max(500).optional().default(""),
+  reward: nonNegativeNumber,
+  daily_limit: optionalPositiveInt,
+  ai_prompt: z.string().trim().min(1, "AI prompt is required").max(4000),
+  cron_time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a time (e.g. 21:00)"),
+  fail_action: z.enum(["pending", "rejected"]),
+  start_at: optionalDateTime,
+  end_at: optionalDateTime,
+  status: z.enum(["active", "inactive"]),
+});
+
+export const taskFormSchema = taskFormObject.refine(endAfterStart, {
+  message: "End time must be after start time",
+  path: ["end_at"],
+});
+
+export const taskFormPatchSchema = taskFormObject.partial();
 
 export const adminAdjustSchema = z.object({
   amount: z.coerce

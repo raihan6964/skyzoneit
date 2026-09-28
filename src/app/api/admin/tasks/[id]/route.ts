@@ -3,7 +3,7 @@ import { withApi, requireAdmin, unwrap } from "@/lib/api";
 import { ApiError } from "@/lib/error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractPackageInfo } from "@/lib/packages";
-import { taskFormSchema } from "@/lib/validations";
+import { taskFormPatchSchema, endAfterStart } from "@/lib/validations";
 import { fromDatetimeLocal } from "@/lib/format";
 import type { Task } from "@/lib/types";
 
@@ -19,11 +19,14 @@ export async function PATCH(
     const admin = createAdminClient();
     const body = await request.json();
 
-    const parsed = taskFormSchema.partial().safeParse(body);
+    const parsed = taskFormPatchSchema.safeParse(body);
     if (!parsed.success) {
       throw new ApiError(parsed.error.issues[0]?.message ?? "Invalid input");
     }
     const value = parsed.data;
+    if (!endAfterStart(value)) {
+      throw new ApiError("End time must be after start time");
+    }
 
     const payload: Record<string, unknown> = {};
     if (value.app_name !== undefined) payload.app_name = value.app_name;
