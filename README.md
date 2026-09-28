@@ -53,7 +53,7 @@ SUPABASE_SERVICE_ROLE_KEY=     ADMIN_EMAIL=
 GROQ_API_KEY=                  GROQ_MODEL=openai/gpt-oss-120b
 IMGBB_API_KEY=
 SHEETS_WEBHOOK_URL=            # /exec URL from Apps Script
-PYTHON_SERVICE_URL=            # e.g. https://your-python.vercel.app/verify
+PYTHON_SERVICE_URL=https://your-python-service.vercel.app  # service root; app calls /verify
 PYTHON_SERVICE_SECRET=
 CRON_SECRET=                   # random string; used by Vercel Cron
 ```
@@ -77,13 +77,13 @@ pytest                # tests (env: VERIFY_URL, PYTHON_SERVICE_SECRET)
 **Web app**
 1. Import repo → Vercel → Framework: Next.js.
 2. Add all env vars above.
-3. `PYTHON_SERVICE_URL` → your Python deployment's `/verify` endpoint.
+3. `PYTHON_SERVICE_URL` → your Python deployment's root URL (the app calls `/verify`).
 4. `vercel.json` schedules `GET /api/cron/verify` daily at **00:20 Asia/Dhaka** (Bearer `CRON_SECRET`). Vercel Hobby only allows one cron run per day — this schedule is Hobby-safe and the route backfills missed runs automatically (Dhaka-time catch-up). On Pro, switch to hourly (`15 * * * *`), or trigger it from an external scheduler (e.g. cron-job.org) with header `Authorization: Bearer <CRON_SECRET>`.
 
 **Python service**
 1. New Vercel project with Root Directory = `python-service/`.
 2. Env vars: `PYTHON_SERVICE_SECRET`.
-3. Test: `curl -X POST <url>/verify -H "Authorization: Bearer <secret>" -H "Content-Type: application/json" -d '{...}'`
+3. Test: `curl -X POST <url>/verify -H "x-secret: <PYTHON_SERVICE_SECRET>" -H "Content-Type: application/json" -d '{...}'`
 
 ### 5. Google Apps Script (sheets sync)
 
