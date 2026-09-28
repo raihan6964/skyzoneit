@@ -225,7 +225,7 @@ export default function LandingPage() {
 
       <footer className="border-t">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:px-6">
-          <Logo className="text-sm" />
+          <Logo className="h-5" />
           <p className="flex items-center gap-1.5">
             <Smartphone className="size-4" />
             <Search className="hidden size-4 sm:block" />

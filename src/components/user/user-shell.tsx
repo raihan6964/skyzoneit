@@ -150,7 +150,7 @@ export function UserShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md md:px-6">
           <div className="md:hidden">
             <Link href="/dashboard">
-              <Logo className="text-sm [&>span:first-child]:size-7" />
+              <Logo className="h-6" />
             </Link>
           </div>
           <div className="hidden items-center gap-2 md:flex">
