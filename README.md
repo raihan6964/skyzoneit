@@ -90,6 +90,7 @@ pytest                # tests (env: VERIFY_URL, PYTHON_SERVICE_SECRET)
 1. Google Sheet → Extensions → Apps Script → paste `google-apps-script/Code.gs`.
 2. Deploy → New deployment → Web app → Execute as: **Me**, Access: **Anyone**.
 3. Copy the `/exec` URL → `SHEETS_WEBHOOK_URL`.
+   Verify: `curl -X POST "$SHEETS_WEBHOOK_URL" -H "Content-Type: application/json" -d "{\"rows\":[]}"` → `{"ok":true,"appended":0}`.
 4. Columns: `Date | User ID | App Name | Reviewer Name | Gmail | Screenshot Link`.
    Rows are always pushed pre-sorted (Date ASC → App Name ASC) so bulk approvals never interleave apps.
 
