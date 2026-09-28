@@ -149,28 +149,44 @@ export default function AdminUsersPage() {
     setBusy(true);
     try {
       if (confirm === "suspend") {
-        await postJson(`/api/admin/users/${target.id}`, {
-          action: "status",
-          status: "suspended",
-        });
+        await postJson(
+          `/api/admin/users/${target.id}`,
+          {
+            action: "status",
+            status: "suspended",
+          },
+          "PATCH"
+        );
         toast.success(`${target.sky_id} suspended`);
       } else if (confirm === "recover") {
-        await postJson(`/api/admin/users/${target.id}`, {
-          action: "status",
-          status: "active",
-        });
+        await postJson(
+          `/api/admin/users/${target.id}`,
+          {
+            action: "status",
+            status: "active",
+          },
+          "PATCH"
+        );
         toast.success(`${target.sky_id} recovered`);
       } else if (confirm === "make-admin") {
-        await postJson(`/api/admin/users/${target.id}`, {
-          action: "role",
-          role: "admin",
-        });
+        await postJson(
+          `/api/admin/users/${target.id}`,
+          {
+            action: "role",
+            role: "admin",
+          },
+          "PATCH"
+        );
         toast.success("Admin access granted");
       } else {
-        await postJson(`/api/admin/users/${target.id}`, {
-          action: "role",
-          role: "user",
-        });
+        await postJson(
+          `/api/admin/users/${target.id}`,
+          {
+            action: "role",
+            role: "user",
+          },
+          "PATCH"
+        );
         toast.success("Admin access removed");
       }
       setConfirm(null);

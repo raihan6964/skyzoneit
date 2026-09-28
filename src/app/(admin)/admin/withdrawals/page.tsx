@@ -110,9 +110,13 @@ export default function AdminWithdrawalsPage() {
     if (!action) return;
     setBusy(true);
     try {
-      await postJson(`/api/admin/withdrawals/${action.id}`, {
-        status: action.status,
-      });
+      await postJson(
+        `/api/admin/withdrawals/${action.id}`,
+        {
+          status: action.status,
+        },
+        "PATCH"
+      );
       toast.success(
         action.status === "paid"
           ? "Withdrawal marked as paid"

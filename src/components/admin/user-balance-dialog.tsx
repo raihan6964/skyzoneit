@@ -57,12 +57,16 @@ export function UserBalanceDialog({
     if (!userId) return;
     setBusy(true);
     try {
-      await postJson(`/api/admin/users/${userId}`, {
-        action: "adjust",
-        direction,
-        amount: values.amount,
-        reason: values.reason,
-      });
+      await postJson(
+        `/api/admin/users/${userId}`,
+        {
+          action: "adjust",
+          direction,
+          amount: values.amount,
+          reason: values.reason,
+        },
+        "PATCH"
+      );
       toast.success(
         direction === "add" ? "Balance added" : "Balance deducted"
       );

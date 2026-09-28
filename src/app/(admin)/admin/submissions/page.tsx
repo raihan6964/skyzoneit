@@ -159,10 +159,14 @@ export default function AdminSubmissionsPage() {
   ) => {
     setBusyId(id);
     try {
-      await postJson(`/api/admin/submissions/${id}`, {
-        action,
-        ...(rejectionReason ? { reason: rejectionReason } : {}),
-      });
+      await postJson(
+        `/api/admin/submissions/${id}`,
+        {
+          action,
+          ...(rejectionReason ? { reason: rejectionReason } : {}),
+        },
+        "PATCH"
+      );
       toast.success(
         action === "approve"
           ? "Submission approved"
