@@ -94,7 +94,8 @@ insert into public.app_settings (key, value)
 values
   ('min_withdrawal', '50'::jsonb),
   ('verify_tz', '"Asia/Dhaka"'::jsonb),
-  ('auto_sync_sheets', 'true'::jsonb)
+  ('auto_sync_sheets', 'true'::jsonb),
+  ('admin_emails', '["skyzoneitltd@gmail.com"]'::jsonb)
 on conflict (key) do nothing;
 
 -- ----------------------------------------------------------------------------
@@ -980,7 +981,8 @@ begin
 end $$;
 
 -- ----------------------------------------------------------------------------
--- Admin bootstrap: after your first signup, run this in the SQL Editor:
---   update public.profiles set role = 'admin' where email = 'you@example.com';
--- (or add your email: update app_settings set value = '["you@example.com"]'::jsonb where key = 'admin_emails';)
+-- Admin bootstrap: signing up with an email listed in app_settings.admin_emails
+-- automatically gives that profile role = 'admin' (seeded with skyzoneitltd@gmail.com).
+-- To grant admin to another email later:
+--   update app_settings set value = value || '["you@example.com"]'::jsonb where key = 'admin_emails';
 -- ----------------------------------------------------------------------------
