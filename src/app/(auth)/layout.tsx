@@ -9,13 +9,18 @@ export default function AuthLayout({
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center bg-background px-4 py-10">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,oklch(0.585_0.163_237.323/0.12),transparent_55%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,oklch(0.55_0.2_277/0.10),transparent_55%)]" />
+      <div className="hero-grid absolute inset-0 [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_65%)]" />
       <div className="relative w-full max-w-sm">
         <div className="mb-6 flex justify-center">
           <Link href="/">
             <Logo />
           </Link>
         </div>
-        <div className="rounded-2xl border bg-card p-6 shadow-sm">{children}</div>
+        <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-lg">
+          <div className="bg-brand-gradient absolute inset-x-0 top-0 h-1" />
+          {children}
+        </div>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           <Link href="/" className="underline underline-offset-4 hover:text-foreground">
             ← Back to home

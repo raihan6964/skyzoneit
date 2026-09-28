@@ -63,8 +63,8 @@ export function TaskCard({
       : 0;
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border bg-card transition-shadow hover:shadow-md">
-      <div className="relative h-32 w-full bg-gradient-to-br from-primary/70 via-primary/45 to-sky-300/60">
+    <div className="flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg">
+      <div className="bg-brand-gradient relative h-32 w-full">
         {task.banner_url ? (
           <Image
             src={task.banner_url}

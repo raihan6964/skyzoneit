@@ -67,8 +67,10 @@ function NavLinks({
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors",
-                active ? "text-primary" : "text-muted-foreground"
+                "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] transition-colors",
+                active
+                  ? "font-bold text-primary"
+                  : "font-medium text-muted-foreground"
               )}
             >
               <Icon className="size-5" />
@@ -83,9 +85,9 @@ function NavLinks({
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
               active
-                ? "bg-primary/10 text-primary"
+                ? "bg-[image:var(--brand-gradient)] text-white shadow-[0_6px_16px_-6px_oklch(0.585_0.163_237.323_/_0.55)]"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >

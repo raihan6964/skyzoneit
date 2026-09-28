@@ -43,9 +43,9 @@ export function AdminNav({ onNavigate }: { onNavigate?: () => void }) {
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all",
               active
-                ? "bg-primary/10 text-primary"
+                ? "bg-[image:var(--brand-gradient)] text-white shadow-[0_6px_16px_-6px_oklch(0.585_0.163_237.323_/_0.55)]"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
