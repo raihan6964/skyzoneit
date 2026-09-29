@@ -22,7 +22,7 @@ export default function AccessTestPage() {
   const [notice, setNotice] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [failed, setFailed] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState("");
   const [attempts, setAttempts] = useState(0);
   const [passed, setPassed] = useState(false);
 
@@ -52,7 +52,7 @@ export default function AccessTestPage() {
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitting(true);
-    setFailed({});
+    setFormError("");
     try {
       const res = await fetch("/api/access-test", {
         method: "POST",
@@ -72,15 +72,9 @@ export default function AccessTestPage() {
         return;
       }
 
-      const map: Record<string, string> = {};
-      for (const item of data.failed ?? []) {
-        if (item && typeof item.id === "string") {
-          map[item.id] = String(item.reason || "উত্তরটি মেলেনি");
-        }
-      }
-      setFailed(map);
       setAttempts(data.attempts ?? 0);
-      toast.error("কিছু উত্তর মিলেনি — দেখে আবার চেষ্টা করুন।");
+      setFormError("কিছু উত্তর ভুল হয়েছে — আবার চেষ্টা করুন।");
+      toast.error("কিছু উত্তর ভুল হয়েছে — আবার চেষ্টা করুন।");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "কিছু একটা সমস্যা হয়েছে"
@@ -195,17 +189,18 @@ export default function AccessTestPage() {
                 required
               />
             )}
-            {failed[question.id] && (
-              <p className="text-xs font-medium text-destructive">
-                {failed[question.id]}
-              </p>
-            )}
           </div>
         ))}
 
         {attempts > 0 && (
           <p className="text-xs text-muted-foreground">
             চেষ্টা: {attempts}
+          </p>
+        )}
+
+        {formError && (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm font-medium text-destructive">
+            {formError}
           </p>
         )}
 

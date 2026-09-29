@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     const { profile } = await requireUser({ allowUnverified: true });
 
     if (profile.access_test_passed) {
-      return Response.json({ passed: true, already: true, failed: [] });
+      return Response.json({ passed: true, already: true });
     }
 
     const body = await request.json().catch(() => null);
@@ -75,7 +75,6 @@ export async function POST(request: Request) {
 
     return Response.json({
       passed: grade.pass,
-      failed: grade.failed,
       attempts: profile.access_test_attempts + 1,
     });
   });

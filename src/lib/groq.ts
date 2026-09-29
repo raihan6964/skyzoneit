@@ -97,7 +97,7 @@ export async function generateReviewText(
 
 export interface AccessTestGrade {
   pass: boolean;
-  failed: { id: string; reason: string }[];
+  failed: string[];
 }
 
 export async function gradeAccessTest(
@@ -120,10 +120,10 @@ export async function gradeAccessTest(
     "Be lenient on wording, strict on meaning: a vague, evasive, empty, gibberish, or clearly wrong answer must FAIL. A wrong fact must FAIL even if phrased confidently.",
     "Bangla digits count: ৩ = 3, ৫০ = 50.",
     "For the yes/no question pass only a clear affirmative (হ্যাঁ, ha, ji, he, hea, yes, দেখেছি, dekhechi...); maybe or non-answers fail.",
-    'Output ONLY minified JSON with no markdown fences and no commentary:',
-    '{"pass":true|false,"failed":[{"id":"<question id>","reason":"<short instruction>"}]}',
-    "failed must contain EVERY failed question id (empty array if all pass). pass must be true only when failed is empty.",
-    'Write each reason as one short simple sentence in Bangla (বাংলা script), e.g. "হ্যাঁ বা না স্পষ্টভাবে লিখুন", "অ্যাকাউন্ট তৈরি বোঝাতে হবে"।',
+    "Output ONLY minified JSON with no markdown fences and no commentary:",
+    '{"pass":true|false,"failed":["<question id>", ...]}',
+    "failed must contain EVERY failed question id as a plain string (empty array if all pass). pass must be true only when failed is empty.",
+    "Return question ids ONLY — never include explanations, hints, reasons or any other text.",
   ].join("\n");
 
   const userContent = JSON.stringify({
@@ -161,20 +161,11 @@ export async function gradeAccessTest(
         continue;
       }
 
-      const failed = parsed.failed
-        .filter(
-          (item): item is { id: string; reason: string } =>
-            !!item &&
-            typeof item === "object" &&
-            typeof (item as { id?: unknown }).id === "string" &&
-            typeof (item as { reason?: unknown }).reason === "string"
-        )
-        .map((item) => ({
-          id: item.id,
-          reason: item.reason.slice(0, 300),
-        }));
+      const failed = (parsed.failed as unknown[])
+        .filter((item): item is string => typeof item === "string")
+        .slice(0, 20);
 
-      return { pass: failed.length === 0, failed };
+      return { pass: parsed.pass === true && failed.length === 0, failed };
     } catch (error) {
       if (attempt === 2) {
         const message =
