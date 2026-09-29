@@ -36,11 +36,14 @@ create table public.tasks (
   fail_action       text not null default 'rejected' check (fail_action in ('pending', 'rejected')),
   start_at          timestamptz,
   end_at            timestamptz,
+  start_time        time,
+  end_time          time,
   status            text not null default 'active' check (status in ('active', 'inactive')),
   last_verify_date  date,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
-  check (end_at is null or start_at is null or end_at > start_at)
+  check (end_at is null or start_at is null or end_at > start_at),
+  check (start_time is null or end_time is null or end_time > start_time)
 );
 
 create table public.submissions (
@@ -334,6 +337,7 @@ declare
   v_uid        uuid := auth.uid();
   v_profile    public.profiles%rowtype;
   v_task       public.tasks%rowtype;
+  v_now        time := (now() at time zone 'Asia/Dhaka')::time;
   v_count      integer;
   v_submission public.submissions%rowtype;
 begin
@@ -361,6 +365,16 @@ begin
   end if;
   if v_task.end_at is not null and now() > v_task.end_at then
     raise exception 'Task has ended';
+  end if;
+
+  if v_task.start_time is not null and v_now < v_task.start_time then
+    raise exception 'Task is locked — opens at % (Asia/Dhaka)',
+      to_char(v_task.start_time, 'HH24:MI');
+  end if;
+  if v_task.end_time is not null and v_now > v_task.end_time then
+    raise exception 'Task is locked for today — closed at % (Asia/Dhaka), opens again at %',
+      to_char(v_task.end_time, 'HH24:MI'),
+      coalesce(to_char(v_task.start_time, 'HH24:MI'), '00:00');
   end if;
 
   if v_task.daily_limit is not null then

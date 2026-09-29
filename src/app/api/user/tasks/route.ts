@@ -50,11 +50,33 @@ export async function GET() {
       });
     }
 
-    const result: UserTask[] = visible.map((task) => ({
-      ...task,
-      submitted_today: countMap.get(task.id)?.today_cnt ?? 0,
-      my_total: countMap.get(task.id)?.my_cnt ?? 0,
-    }));
+    // current time-of-day in Asia/Dhaka (fixed UTC+6, no DST)
+    const dhaka = new Date(Date.now() + 6 * 3600 * 1000);
+    const nowSeconds =
+      dhaka.getUTCHours() * 3600 + dhaka.getUTCMinutes() * 60 + dhaka.getUTCSeconds();
+    const toSeconds = (value: string | null) => {
+      if (!value) return null;
+      const [h, m] = value.split(":");
+      return Number(h) * 3600 + Number(m) * 60;
+    };
+
+    const result: UserTask[] = visible.map((task) => {
+      const today_cnt = countMap.get(task.id)?.today_cnt ?? 0;
+      const opensAt = toSeconds(task.start_time);
+      const closesAt = toSeconds(task.end_time);
+      const inWindow =
+        (opensAt === null || nowSeconds >= opensAt) &&
+        (closesAt === null || nowSeconds <= closesAt);
+      const limitReached =
+        task.daily_limit !== null && today_cnt >= task.daily_limit;
+      return {
+        ...task,
+        submitted_today: today_cnt,
+        my_total: countMap.get(task.id)?.my_cnt ?? 0,
+        locked: !inWindow || limitReached,
+        lock_reason: !inWindow ? "window" : limitReached ? "limit" : null,
+      };
+    });
 
     return Response.json({ tasks: result });
   });

@@ -52,6 +52,14 @@ export function formatTimeRange(start: string | null, end: string | null): strin
 
 const DHIKANA_TZ = "Asia/Dhaka";
 
+export function formatDailyWindow(
+  start: string | null,
+  end: string | null
+): string {
+  if (!start && !end) return "Always open";
+  return `${start ?? "00:00"} → ${end ?? "24:00"} daily`;
+}
+
 export function toDatetimeLocal(iso: string | null): string {
   if (!iso) return "";
   const date = new Date(iso);

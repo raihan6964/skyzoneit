@@ -65,6 +65,18 @@ export function endAfterStart(data: { start_at?: string | null; end_at?: string 
   return !data.start_at || !data.end_at || new Date(data.end_at) > new Date(data.start_at);
 }
 
+const optionalTime = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? null : value),
+  z.string().regex(/^\d{2}:\d{2}$/, "Pick a time (e.g. 14:00)").nullable()
+);
+
+export function dailyEndAfterStart(data: {
+  start_time?: string | null;
+  end_time?: string | null;
+}) {
+  return !data.start_time || !data.end_time || data.end_time > data.start_time;
+}
+
 const taskFormObject = z.object({
   app_name: z.string().trim().min(1, "App name is required").max(80),
   app_link: z.url("Enter a valid store URL"),
@@ -79,13 +91,20 @@ const taskFormObject = z.object({
   fail_action: z.enum(["pending", "rejected"]),
   start_at: optionalDateTime,
   end_at: optionalDateTime,
+  start_time: optionalTime,
+  end_time: optionalTime,
   status: z.enum(["active", "inactive"]),
 });
 
-export const taskFormSchema = taskFormObject.refine(endAfterStart, {
-  message: "End time must be after start time",
-  path: ["end_at"],
-});
+export const taskFormSchema = taskFormObject
+  .refine(endAfterStart, {
+    message: "End time must be after start time",
+    path: ["end_at"],
+  })
+  .refine(dailyEndAfterStart, {
+    message: "Close time must be after open time",
+    path: ["end_time"],
+  });
 
 export const taskFormPatchSchema = taskFormObject.partial();
 

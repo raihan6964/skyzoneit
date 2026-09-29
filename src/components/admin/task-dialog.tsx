@@ -56,6 +56,8 @@ const DEFAULT_VALUES: TaskFormValues = {
   fail_action: "pending",
   start_at: "",
   end_at: "",
+  start_time: "",
+  end_time: "",
   status: "active",
 };
 
@@ -110,6 +112,8 @@ export function TaskDialog({
             fail_action: current.fail_action,
             start_at: toDatetimeLocal(current.start_at),
             end_at: toDatetimeLocal(current.end_at),
+            start_time: current.start_time ?? "",
+            end_time: current.end_time ?? "",
             status: current.status,
           }
         : DEFAULT_VALUES
@@ -469,6 +473,40 @@ export function TaskDialog({
               {errors.end_at && (
                 <p className="text-xs text-destructive">
                   {errors.end_at.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="task-start-time">Daily opens at</Label>
+              <Input
+                id="task-start-time"
+                type="time"
+                {...register("start_time")}
+              />
+              <p className="text-xs text-muted-foreground">
+                Asia/Dhaka. Leave empty for always open.
+              </p>
+              {errors.start_time && (
+                <p className="text-xs text-destructive">
+                  {errors.start_time.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="task-end-time">Daily closes at</Label>
+              <Input
+                id="task-end-time"
+                type="time"
+                {...register("end_time")}
+              />
+              <p className="text-xs text-muted-foreground">
+                Outside this window the task is locked for everyone.
+              </p>
+              {errors.end_time && (
+                <p className="text-xs text-destructive">
+                  {errors.end_time.message}
                 </p>
               )}
             </div>

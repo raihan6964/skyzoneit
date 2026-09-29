@@ -3,7 +3,7 @@ import { withApi, requireAdmin, unwrap } from "@/lib/api";
 import { ApiError } from "@/lib/error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractPackageInfo } from "@/lib/packages";
-import { taskFormPatchSchema, endAfterStart } from "@/lib/validations";
+import { taskFormPatchSchema, endAfterStart, dailyEndAfterStart } from "@/lib/validations";
 import { fromDatetimeLocal } from "@/lib/format";
 import type { Task } from "@/lib/types";
 
@@ -26,6 +26,9 @@ export async function PATCH(
     const value = parsed.data;
     if (!endAfterStart(value)) {
       throw new ApiError("End time must be after start time");
+    }
+    if (!dailyEndAfterStart(value)) {
+      throw new ApiError("Close time must be after open time");
     }
 
     // Only touch keys that were actually sent: schema defaults
@@ -61,6 +64,8 @@ export async function PATCH(
     if (has("fail_action")) payload.fail_action = value.fail_action;
     if (has("start_at")) payload.start_at = fromDatetimeLocal(value.start_at ?? "");
     if (has("end_at")) payload.end_at = fromDatetimeLocal(value.end_at ?? "");
+    if (has("start_time")) payload.start_time = value.start_time ?? null;
+    if (has("end_time")) payload.end_time = value.end_time ?? null;
     if (has("status")) payload.status = value.status;
 
     if (Object.keys(payload).length === 0) {

@@ -31,6 +31,8 @@ function normalizeTaskInput(body: unknown) {
     fail_action: value.fail_action,
     start_at: fromDatetimeLocal(value.start_at ?? ""),
     end_at: fromDatetimeLocal(value.end_at ?? ""),
+    start_time: value.start_time ?? null,
+    end_time: value.end_time ?? null,
     status: value.status,
   };
 }

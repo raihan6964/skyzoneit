@@ -32,6 +32,8 @@ export interface Task {
   fail_action: FailAction;
   start_at: string | null;
   end_at: string | null;
+  start_time: string | null;
+  end_time: string | null;
   status: TaskStatus;
   last_verify_date: string | null;
   created_at: string;
@@ -100,6 +102,8 @@ export interface CrmStats {
 export interface UserTask extends Task {
   submitted_today: number;
   my_total: number;
+  locked: boolean;
+  lock_reason: "window" | "limit" | null;
 }
 
 export interface SheetRow {

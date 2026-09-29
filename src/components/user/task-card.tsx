@@ -11,6 +11,7 @@ import {
   ExternalLink,
   ImageIcon,
   Loader2,
+  Lock,
   Send,
   X,
 } from "lucide-react";
@@ -28,7 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { formatTK, formatTimeRange } from "@/lib/format";
+import { formatTK, formatTimeRange, formatDailyWindow } from "@/lib/format";
 import { postJson } from "@/lib/hooks";
 import { submissionSchema, type SubmissionInput } from "@/lib/validations";
 import type { UserTask } from "@/lib/types";
@@ -57,6 +58,7 @@ export function TaskCard({
 }) {
   const limitReached =
     task.daily_limit !== null && task.submitted_today >= task.daily_limit;
+  const windowLocked = task.lock_reason === "window";
   const progressValue =
     task.daily_limit !== null
       ? Math.min(100, (task.submitted_today / task.daily_limit) * 100)
@@ -81,6 +83,12 @@ export function TaskCard({
         <span className="absolute left-2 top-2 rounded-md bg-background/90 px-2 py-0.5 text-xs font-semibold text-primary shadow-sm">
           {formatTK(task.reward)} / review
         </span>
+        {task.locked && (
+          <span className="absolute right-2 top-2 flex items-center gap-1 rounded-md bg-amber-500/90 px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
+            <Lock className="size-3" />
+            {windowLocked ? "Scheduled" : "Limit reached"}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
@@ -92,6 +100,9 @@ export function TaskCard({
         <div className="space-y-1 text-xs text-muted-foreground">
           <p className="font-medium text-foreground/80">
             {formatTimeRange(task.start_at, task.end_at)}
+          </p>
+          <p className="font-medium text-foreground/80">
+            {formatDailyWindow(task.start_time, task.end_time)}
           </p>
           <p>
             You submitted: <span className="font-semibold text-foreground">{task.my_total}</span>
@@ -119,6 +130,7 @@ export function TaskCard({
           <SubmitDialog
             task={task}
             limitReached={limitReached}
+            windowLocked={windowLocked}
             onChanged={onChanged}
           />
         </div>
@@ -178,6 +190,12 @@ function DetailsDialog({ task }: { task: UserTask }) {
               </dd>
             </div>
             <div className="col-span-2 rounded-lg bg-muted/60 p-2.5">
+              <dt className="text-xs text-muted-foreground">Daily window</dt>
+              <dd className="font-medium">
+                {formatDailyWindow(task.start_time, task.end_time)}
+              </dd>
+            </div>
+            <div className="col-span-2 rounded-lg bg-muted/60 p-2.5">
               <dt className="text-xs text-muted-foreground">Package</dt>
               <dd className="truncate font-mono text-xs">{task.package_name}</dd>
             </div>
@@ -201,10 +219,12 @@ function DetailsDialog({ task }: { task: UserTask }) {
 function SubmitDialog({
   task,
   limitReached,
+  windowLocked,
   onChanged,
 }: {
   task: UserTask;
   limitReached: boolean;
+  windowLocked: boolean;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -288,11 +308,19 @@ function SubmitDialog({
     >
       <DialogTrigger
         render={
-          <Button className="w-full" disabled={limitReached} />
+          <Button
+            className="w-full"
+            disabled={limitReached || windowLocked}
+          />
         }
       >
         {limitReached ? (
           "Daily limit reached"
+        ) : windowLocked ? (
+          <>
+            <Lock className="size-4" />
+            Locked — opens {task.start_time ?? "00:00"}
+          </>
         ) : (
           <>
             <Send className="size-4" />

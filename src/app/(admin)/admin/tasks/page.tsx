@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatTK } from "@/lib/format";
+import { formatTK, formatDailyWindow } from "@/lib/format";
 import { postJson, useApi } from "@/lib/hooks";
 import type { Task } from "@/lib/types";
 
@@ -175,6 +175,11 @@ export default function AdminTasksPage() {
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground lg:table-cell">
                     {formatCron(task.cron_time)}
+                    {(task.start_time || task.end_time) && (
+                      <span className="block text-xs font-medium text-primary">
+                        {formatDailyWindow(task.start_time, task.end_time)}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className="flex items-center gap-2">
