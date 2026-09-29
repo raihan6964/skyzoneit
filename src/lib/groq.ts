@@ -116,13 +116,14 @@ export async function gradeAccessTest(
 
   const system = [
     "You grade a 5-question access test for new users of a gig-work platform.",
-    "The reference answers were written by the site owner. Users answer in English, Bangla, or romanized Banglish — casual wording, typos and mixed languages are normal.",
-    "Judge MEANING, not exact words: accept synonyms, casual phrasing and language mixes when the core meaning matches the reference. Be lenient on wording, strict on meaning.",
-    "A vague, evasive, empty, gibberish, or clearly wrong answer must FAIL. A wrong fact must FAIL even if phrased confidently.",
-    "For the yes/no question pass only a clear affirmative (ha, ji, he, hea, yes, dekhechi...); maybe or non-answers fail.",
-    "Output ONLY minified JSON with no markdown fences and no commentary:",
-    '{"pass":true|false,"failed":[{"id":"<question id>","reason":"<one short instruction for the user>"}]}',
+    "The reference answers were written by the site owner. Users answer in Bangla (Bengali script), Banglish (romanized Bengali), or English — all three languages are equally valid. Judge MEANING only; never fail an answer because it is in a different language than the reference. Casual wording, typos and mixed languages are normal.",
+    "Be lenient on wording, strict on meaning: a vague, evasive, empty, gibberish, or clearly wrong answer must FAIL. A wrong fact must FAIL even if phrased confidently.",
+    "Bangla digits count: ৩ = 3, ৫০ = 50.",
+    "For the yes/no question pass only a clear affirmative (হ্যাঁ, ha, ji, he, hea, yes, দেখেছি, dekhechi...); maybe or non-answers fail.",
+    'Output ONLY minified JSON with no markdown fences and no commentary:',
+    '{"pass":true|false,"failed":[{"id":"<question id>","reason":"<short instruction>"}]}',
     "failed must contain EVERY failed question id (empty array if all pass). pass must be true only when failed is empty.",
+    'Write each reason as one short simple sentence in Bangla (বাংলা script), e.g. "হ্যাঁ বা না স্পষ্টভাবে লিখুন", "অ্যাকাউন্ট তৈরি বোঝাতে হবে"।',
   ].join("\n");
 
   const userContent = JSON.stringify({

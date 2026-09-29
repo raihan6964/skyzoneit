@@ -32,13 +32,13 @@ export default function AccessTestPage() {
       try {
         const res = await fetch("/api/access-test");
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to load the test");
+        if (!res.ok) throw new Error(data.error || "টেস্ট লোড করা যায়নি");
         if (cancelled) return;
         setNotice(data.notice || "");
         setQuestions(Array.isArray(data.questions) ? data.questions : []);
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : "Failed to load the test"
+          error instanceof Error ? error.message : "টেস্ট লোড করা যায়নি"
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -60,11 +60,11 @@ export default function AccessTestPage() {
         body: JSON.stringify({ answers }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Submit failed");
+      if (!res.ok) throw new Error(data.error || "জমা দিতে সমস্যা হয়েছে");
 
       if (data.passed) {
         setPassed(true);
-        toast.success("Test passed — access granted!");
+        toast.success("টেস্ট পাস — অ্যাক্সেস পেয়ে গেছেন!");
         setTimeout(() => {
           router.replace("/dashboard");
           router.refresh();
@@ -75,15 +75,15 @@ export default function AccessTestPage() {
       const map: Record<string, string> = {};
       for (const item of data.failed ?? []) {
         if (item && typeof item.id === "string") {
-          map[item.id] = String(item.reason || "Answer did not match");
+          map[item.id] = String(item.reason || "উত্তরটি মেলেনি");
         }
       }
       setFailed(map);
       setAttempts(data.attempts ?? 0);
-      toast.error("Kichu answer match koreni — review kore abar try koren.");
+      toast.error("কিছু উত্তর মিলেনি — দেখে আবার চেষ্টা করুন।");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Something went wrong"
+        error instanceof Error ? error.message : "কিছু একটা সমস্যা হয়েছে"
       );
     } finally {
       setSubmitting(false);
@@ -113,7 +113,7 @@ export default function AccessTestPage() {
     return shell(
       <div className="flex flex-col items-center gap-3 py-10 text-muted-foreground">
         <Loader2 className="size-6 animate-spin" />
-        <p className="text-sm">Loading test...</p>
+        <p className="text-sm">টেস্ট লোড হচ্ছে...</p>
       </div>
     );
   }
@@ -124,13 +124,13 @@ export default function AccessTestPage() {
         <CheckCircle2 className="mx-auto size-12 text-emerald-600" />
         <div className="space-y-1.5">
           <h1 className="text-xl font-semibold tracking-tight">
-            Test passed — access granted!
+            টেস্ট পাস — অ্যাক্সেস পেয়ে গেছেন!
           </h1>
           <p className="text-sm text-muted-foreground">
-            Apnar dashboard unlock hoise. Redirect hocche...
+            আপনার ড্যাশবোর্ড আনলক হয়ে গেছে। রিডাইরেক্ট হচ্ছে...
           </p>
         </div>
-        <Button render={<Link href="/dashboard" />}>Go to dashboard</Button>
+        <Button render={<Link href="/dashboard" />}>ড্যাশবোর্ডে যান</Button>
       </div>
     );
   }
@@ -138,10 +138,12 @@ export default function AccessTestPage() {
   return shell(
     <div className="space-y-5">
       <div className="space-y-1.5 text-center">
-        <h1 className="text-xl font-semibold tracking-tight">Access Test</h1>
+        <h1 className="text-xl font-semibold tracking-tight">
+          অ্যাক্সেস টেস্ট
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Notun jonno screening — video dekhechen kina seta bujhar jonno 5 ta
-          question. Ekbar pass korle abar dite hobe na.
+          নতুন জনের স্ক্রিনিং — ভিডিও দেখেছেন কিনা সেটা বোঝার জন্য ৫টি প্রশ্ন।
+          একবার পাস করলে আবার দিতে হবে না।
         </p>
       </div>
 
@@ -149,7 +151,7 @@ export default function AccessTestPage() {
         <div className="rounded-xl border border-amber-500/60 bg-amber-500/15 p-4 shadow-sm">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
             <AlertTriangle className="size-4 shrink-0" />
-            <span>Screening test — important rules</span>
+            <span>স্ক্রিনিং টেস্ট — গুরুত্বপূর্ণ নিয়ম</span>
           </div>
           <div className="space-y-2 text-[13px] leading-relaxed text-amber-900/90 dark:text-amber-100/90">
             {notice.split("\n\n").map((paragraph, index) => (
@@ -169,7 +171,7 @@ export default function AccessTestPage() {
               <Textarea
                 id={question.id}
                 rows={3}
-                placeholder="Bojhaiya bolen..."
+                placeholder="বুঝিয়ে বলুন..."
                 value={answers[question.id] ?? ""}
                 onChange={(event) =>
                   setAnswers((prev) => ({
@@ -182,7 +184,7 @@ export default function AccessTestPage() {
             ) : (
               <Input
                 id={question.id}
-                placeholder="Your answer..."
+                placeholder="আপনার উত্তর লিখুন..."
                 value={answers[question.id] ?? ""}
                 onChange={(event) =>
                   setAnswers((prev) => ({
@@ -203,7 +205,7 @@ export default function AccessTestPage() {
 
         {attempts > 0 && (
           <p className="text-xs text-muted-foreground">
-            Attempts: {attempts}
+            চেষ্টা: {attempts}
           </p>
         )}
 
@@ -211,18 +213,19 @@ export default function AccessTestPage() {
           {submitting ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Checking with AI...
+              AI দিয়ে চেক হচ্ছে...
             </>
           ) : (
             <>
               <Send className="size-4" />
-              Submit answers
+              উত্তর জমা দিন
             </>
           )}
         </Button>
 
         <p className="text-center text-xs text-muted-foreground">
-          Answers AI diye check howa hobe — meaning match hole pass.
+          উত্তর AI দিয়ে চেক করা হবে — অর্থ মিললেই পাস (বাংলা / বাংলিশ /
+          ইংরেজি — যেকোনো ভাষায় লিখুন)।
         </p>
       </form>
     </div>
