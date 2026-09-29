@@ -12,7 +12,10 @@ export async function GET() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(30),
-      supabase.from("app_settings").select("key, value"),
+      supabase
+        .from("app_settings")
+        .select("key, value")
+        .eq("key", "min_withdrawal"),
     ]);
 
     const minWithdrawal = settings?.find(

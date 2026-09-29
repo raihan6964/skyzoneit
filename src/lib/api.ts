@@ -30,7 +30,7 @@ export function unwrap<T>(result: SupabaseResult<T>): NonNullable<T> {
   return result.data as NonNullable<T>;
 }
 
-export async function requireUser() {
+export async function requireUser(options: { allowUnverified?: boolean } = {}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -45,11 +45,18 @@ export async function requireUser() {
   if (profile.status === "suspended") {
     throw new ApiError("Your account is suspended", 403);
   }
+  if (
+    !options.allowUnverified &&
+    profile.role !== "admin" &&
+    !profile.access_test_passed
+  ) {
+    throw new ApiError("Access test required", 403);
+  }
   return { supabase, user, profile };
 }
 
 export async function requireAdmin() {
-  const context = await requireUser();
+  const context = await requireUser({ allowUnverified: true });
   const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
   const isAdmin =
     context.profile.role === "admin" ||

@@ -136,6 +136,18 @@ export const withdrawalActionSchema = z.object({
   status: z.enum(["paid", "cancelled"]),
 });
 
+const accessTestAnswer = z.string().trim().min(1, "Answer is required").max(1500);
+
+export const accessTestSchema = z.object({
+  answers: z.object({
+    watched: accessTestAnswer,
+    part2: accessTestAnswer,
+    parts: accessTestAnswer,
+    method: accessTestAnswer,
+    min_withdraw: accessTestAnswer,
+  }),
+});
+
 export type SignupInput = z.input<typeof signupSchema>;
 export type LoginInput = z.input<typeof loginSchema>;
 export type ResetPasswordInput = z.input<typeof resetPasswordSchema>;
@@ -143,3 +155,4 @@ export type NewPasswordInput = z.input<typeof newPasswordSchema>;
 export type SubmissionInput = z.input<typeof submissionSchema>;
 export type WithdrawInput = z.input<typeof withdrawSchema>;
 export type TaskFormInput = z.input<typeof taskFormSchema>;
+export type AccessTestInput = z.input<typeof accessTestSchema>;

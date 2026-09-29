@@ -94,3 +94,97 @@ export async function generateReviewText(
     ? new ApiError("AI returned an empty review", 502)
     : new ApiError("AI returned an unusually long response, please try again", 502);
 }
+
+export interface AccessTestGrade {
+  pass: boolean;
+  failed: { id: string; reason: string }[];
+}
+
+export async function gradeAccessTest(
+  correct: Record<string, string>,
+  answers: Record<string, string>
+): Promise<AccessTestGrade> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new ApiError("AI is not configured (missing GROQ_API_KEY)", 503);
+  }
+
+  const client = new OpenAI({
+    apiKey,
+    baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
+  });
+
+  const system = [
+    "You grade a 5-question access test for new users of a gig-work platform.",
+    "The reference answers were written by the site owner. Users answer in English, Bangla, or romanized Banglish — casual wording, typos and mixed languages are normal.",
+    "Judge MEANING, not exact words: accept synonyms, casual phrasing and language mixes when the core meaning matches the reference. Be lenient on wording, strict on meaning.",
+    "A vague, evasive, empty, gibberish, or clearly wrong answer must FAIL. A wrong fact must FAIL even if phrased confidently.",
+    "For the yes/no question pass only a clear affirmative (ha, ji, he, hea, yes, dekhechi...); maybe or non-answers fail.",
+    "Output ONLY minified JSON with no markdown fences and no commentary:",
+    '{"pass":true|false,"failed":[{"id":"<question id>","reason":"<one short instruction for the user>"}]}',
+    "failed must contain EVERY failed question id (empty array if all pass). pass must be true only when failed is empty.",
+  ].join("\n");
+
+  const userContent = JSON.stringify({
+    reference_answers: correct,
+    user_answers: answers,
+  });
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await client.chat.completions.create({
+        model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+        temperature: 0,
+        max_tokens: 2000,
+        reasoning_effort: "low",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userContent },
+        ],
+      });
+
+      const raw = (response.choices[0]?.message?.content ?? "").trim();
+      const cleaned = raw
+        .replace(/^```[a-zA-Z]*\s*/, "")
+        .replace(/\s*```$/, "")
+        .trim();
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
+      if (start === -1 || end <= start) continue;
+
+      const parsed = JSON.parse(cleaned.slice(start, end + 1)) as {
+        pass?: unknown;
+        failed?: unknown;
+      };
+      if (typeof parsed.pass !== "boolean" || !Array.isArray(parsed.failed)) {
+        continue;
+      }
+
+      const failed = parsed.failed
+        .filter(
+          (item): item is { id: string; reason: string } =>
+            !!item &&
+            typeof item === "object" &&
+            typeof (item as { id?: unknown }).id === "string" &&
+            typeof (item as { reason?: unknown }).reason === "string"
+        )
+        .map((item) => ({
+          id: item.id,
+          reason: item.reason.slice(0, 300),
+        }));
+
+      return { pass: failed.length === 0, failed };
+    } catch (error) {
+      if (attempt === 2) {
+        const message =
+          error instanceof Error ? error.message : "AI request failed";
+        throw new ApiError(`AI verification failed: ${message}`, 502);
+      }
+    }
+  }
+
+  throw new ApiError(
+    "AI verification returned an invalid response, please try again",
+    502
+  );
+}

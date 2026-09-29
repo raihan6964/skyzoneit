@@ -24,23 +24,6 @@ async function resolveSession(request: NextRequest) {
   return { user, supabase };
 }
 
-async function isAdmin(
-  supabase: NonNullable<Awaited<ReturnType<typeof resolveSession>>["supabase"]>,
-  userId: string,
-  email: string | undefined
-) {
-  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
-  if (adminEmail && email && email.toLowerCase() === adminEmail) return true;
-
-  const { data } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single();
-
-  return data?.role === "admin";
-}
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const { user, supabase } = await resolveSession(request);
@@ -49,6 +32,24 @@ export async function proxy(request: NextRequest) {
   const isAdminPanel = pathname.startsWith("/admin");
   const isUserPanel = pathname.startsWith("/dashboard");
   const isAuthPage = AUTH_PAGES.includes(pathname);
+  const isTestPage = pathname === "/access-test";
+
+  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
+  let profile: { role: string | null; access_test_passed: boolean | null } | null =
+    null;
+  if (user && supabase) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("role, access_test_passed")
+      .eq("id", user.id)
+      .single();
+    profile = data;
+  }
+
+  const isAdminUser =
+    profile?.role === "admin" ||
+    (!!adminEmail && !!user?.email && user.email.toLowerCase() === adminEmail);
+  const testPassed = isAdminUser || profile?.access_test_passed === true;
 
   if (isApiAdmin || isAdminPanel) {
     if (!user || !supabase) {
@@ -59,7 +60,7 @@ export async function proxy(request: NextRequest) {
       login.searchParams.set("next", pathname);
       return NextResponse.redirect(login);
     }
-    if (!(await isAdmin(supabase, user.id, user.email))) {
+    if (!isAdminUser) {
       if (isApiAdmin) {
         return Response.json({ error: "Admin access required" }, { status: 403 });
       }
@@ -67,18 +68,31 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (isUserPanel && !user) {
-    const login = new URL("/login", request.url);
-    login.searchParams.set("next", pathname);
-    return NextResponse.redirect(login);
+  if (isTestPage) {
+    if (!user) return NextResponse.redirect(new URL("/login", request.url));
+    if (testPassed)
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.next();
   }
 
+  if (isUserPanel) {
+    if (!user) {
+      const login = new URL("/login", request.url);
+      login.searchParams.set("next", pathname);
+      return NextResponse.redirect(login);
+    }
+    if (!testPassed)
+      return NextResponse.redirect(new URL("/access-test", request.url));
+  }
+
+  const landing = user && !testPassed ? "/access-test" : "/dashboard";
+
   if (isAuthPage && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL(landing, request.url));
   }
 
   if (pathname === "/" && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL(landing, request.url));
   }
 
   return NextResponse.next();
@@ -92,6 +106,7 @@ export const config = {
     "/login",
     "/signup",
     "/forgot-password",
+    "/access-test",
     "/api/admin/:path*",
   ],
 };

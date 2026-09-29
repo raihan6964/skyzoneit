@@ -14,6 +14,8 @@ export interface Profile {
   role: Role;
   balance: number;
   status: AccountStatus;
+  access_test_passed: boolean;
+  access_test_attempts: number;
   created_at: string;
 }
 

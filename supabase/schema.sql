@@ -18,6 +18,8 @@ create table public.profiles (
   role        text not null default 'user' check (role in ('user', 'admin')),
   balance     numeric(12, 2) not null default 0 check (balance >= 0),
   status      text not null default 'active' check (status in ('active', 'suspended')),
+  access_test_passed   boolean not null default false,
+  access_test_attempts integer not null default 0,
   created_at  timestamptz not null default now()
 );
 
@@ -98,7 +100,24 @@ values
   ('min_withdrawal', '50'::jsonb),
   ('verify_tz', '"Asia/Dhaka"'::jsonb),
   ('auto_sync_sheets', 'true'::jsonb),
-  ('admin_emails', '["skyzoneitltd@gmail.com"]'::jsonb)
+  ('admin_emails', '["skyzoneitltd@gmail.com"]'::jsonb),
+  ('access_test', '{
+    "notice": "Ei question er answer video te direct word-to-word bola hoyni, kintu video te bojhaiya deya hoyeche. Tai apni ja bujhte parsen tar basis e answer din.\n\nKintu kono vabei group er keo theke answer jigges korben na. Jodi keo ke disturb koren, ba answer jigges kore, ba cheating kore answer janar chesta koren, tahole group theke banned kora hobe ar kaj o deya hobe na.\n\nMone rakhben: apni chaile karor kache kaj ta ektu bojhe nite parben, but direct answer jigges kora jabe na.",
+    "questions": [
+      { "id": "watched", "q": "Apni ki video ta monojog diye dekhechen?" },
+      { "id": "part2", "q": "Video te dekhano second part er nam ki?" },
+      { "id": "parts", "q": "Video total koita part er kotha bola hoise?" },
+      { "id": "method", "q": "Get free review method ta ki, bojhaiya koren." },
+      { "id": "min_withdraw", "q": "Website er minimum withdrawal koto TK?" }
+    ],
+    "correct": {
+      "watched": "The user must clearly say YES that they watched the video. Any affirmative counts (hea, ha, ha ji, ji, yes, dekhechi, etc).",
+      "part2": "Account creation. Accept any wording meaning the same: account creation, account create, account toiri, signup, sign up, register, account banano.",
+      "parts": "3 parts. Accept: 3, three, tin.",
+      "method": "Facebook group e post/marketing kore, shekhan theke manusher ke inbox/chat e niye, tai der kache review niye, tarpor oi review gulo website e submit kora. Key points: (a) Facebook or group e marketing/post (b) inbox/chat e niye jawa (c) manush theke review newa (d) website e submit kora. A casual answer substantially covering these points must pass.",
+      "min_withdraw": "50 TK. Accept: 50, 50 taka, 50tk, 50 tk."
+    }
+  }'::jsonb)
 on conflict (key) do nothing;
 
 -- ----------------------------------------------------------------------------
@@ -311,7 +330,7 @@ create policy balance_tx_select on public.balance_transactions
 
 create policy settings_select on public.app_settings
   for select to authenticated
-  using (true);
+  using (public.is_admin() or key <> 'access_test');
 
 create policy settings_admin_write on public.app_settings
   for update to authenticated
