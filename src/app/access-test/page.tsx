@@ -23,6 +23,7 @@ export default function AccessTestPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState("");
+  const [failedIds, setFailedIds] = useState<string[]>([]);
   const [attempts, setAttempts] = useState(0);
   const [passed, setPassed] = useState(false);
 
@@ -49,10 +50,16 @@ export default function AccessTestPage() {
     };
   }, []);
 
+  const updateAnswer = (id: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [id]: value }));
+    setFailedIds((prev) => prev.filter((item) => item !== id));
+  };
+
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitting(true);
     setFormError("");
+    setFailedIds([]);
     try {
       const res = await fetch("/api/access-test", {
         method: "POST",
@@ -73,7 +80,8 @@ export default function AccessTestPage() {
       }
 
       setAttempts(data.attempts ?? 0);
-      setFormError("কিছু উত্তর ভুল হয়েছে — আবার চেষ্টা করুন।");
+      setFailedIds(Array.isArray(data.failed) ? data.failed : []);
+      setFormError("কিছু উত্তর ভুল হয়েছে — লাল চিহ্নিত প্রশ্নগুলো দেখে আবার চেষ্টা করুন।");
       toast.error("কিছু উত্তর ভুল হয়েছে — আবার চেষ্টা করুন।");
     } catch (error) {
       toast.error(
@@ -156,41 +164,47 @@ export default function AccessTestPage() {
       )}
 
       <form onSubmit={onSubmit} className="space-y-4">
-        {questions.map((question, index) => (
-          <div key={question.id} className="space-y-1.5">
-            <Label htmlFor={question.id}>
-              {index + 1}. {question.q}
-            </Label>
-            {LONG_IDS.has(question.id) ? (
-              <Textarea
-                id={question.id}
-                rows={3}
-                placeholder="বুঝিয়ে বলুন..."
-                value={answers[question.id] ?? ""}
-                onChange={(event) =>
-                  setAnswers((prev) => ({
-                    ...prev,
-                    [question.id]: event.target.value,
-                  }))
-                }
-                required
-              />
-            ) : (
-              <Input
-                id={question.id}
-                placeholder="আপনার উত্তর লিখুন..."
-                value={answers[question.id] ?? ""}
-                onChange={(event) =>
-                  setAnswers((prev) => ({
-                    ...prev,
-                    [question.id]: event.target.value,
-                  }))
-                }
-                required
-              />
-            )}
-          </div>
-        ))}
+        {questions.map((question, index) => {
+          const isFailed = failedIds.includes(question.id);
+          return (
+            <div key={question.id} className="space-y-1.5">
+              <Label htmlFor={question.id} className="flex items-center gap-1.5">
+                <span>
+                  {index + 1}. {question.q}
+                </span>
+                {isFailed && (
+                  <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] font-semibold text-destructive">
+                    ভুল
+                  </span>
+                )}
+              </Label>
+              {LONG_IDS.has(question.id) ? (
+                <Textarea
+                  id={question.id}
+                  rows={3}
+                  placeholder="বুঝিয়ে বলুন..."
+                  className={
+                    isFailed ? "border-destructive focus-visible:border-destructive" : undefined
+                  }
+                  value={answers[question.id] ?? ""}
+                  onChange={(event) => updateAnswer(question.id, event.target.value)}
+                  required
+                />
+              ) : (
+                <Input
+                  id={question.id}
+                  placeholder="আপনার উত্তর লিখুন..."
+                  className={
+                    isFailed ? "border-destructive focus-visible:border-destructive" : undefined
+                  }
+                  value={answers[question.id] ?? ""}
+                  onChange={(event) => updateAnswer(question.id, event.target.value)}
+                  required
+                />
+              )}
+            </div>
+          );
+        })}
 
         {attempts > 0 && (
           <p className="text-xs text-muted-foreground">

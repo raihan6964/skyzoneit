@@ -75,6 +75,7 @@ export async function POST(request: Request) {
 
     return Response.json({
       passed: grade.pass,
+      failed: grade.pass ? [] : grade.failed,
       attempts: profile.access_test_attempts + 1,
     });
   });
