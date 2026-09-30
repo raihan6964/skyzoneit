@@ -509,7 +509,7 @@ export default function AdminSubmissionsPage() {
                   <TableCell className="hidden md:table-cell">
                     <p className="font-medium">{row.reviewer_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {row.reviewer_gmail}
+                      {row.reviewer_gmail || "—"}
                     </p>
                   </TableCell>
                   <TableCell>

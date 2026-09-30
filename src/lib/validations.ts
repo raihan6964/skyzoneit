@@ -29,7 +29,14 @@ export const submissionSchema = z.object({
     .trim()
     .min(2, "Reviewer name is required")
     .max(60, "Name is too long"),
-  reviewer_gmail: z.email("Enter a valid Gmail address"),
+  reviewer_gmail: z
+    .string()
+    .trim()
+    .max(100, "Email is too long")
+    .refine(
+      (value) => value === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+      { message: "Enter a valid Gmail address" }
+    ),
 });
 
 export const withdrawSchema = z.object({

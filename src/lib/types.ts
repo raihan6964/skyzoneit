@@ -47,7 +47,7 @@ export interface Submission {
   user_id: string;
   task_id: string;
   reviewer_name: string;
-  reviewer_gmail: string;
+  reviewer_gmail: string | null;
   screenshot_url: string;
   status: SubmissionStatus;
   submitted_date: string;

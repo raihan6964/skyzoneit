@@ -106,7 +106,7 @@ export default function HistoryPage() {
                     <TableCell>
                       <p className="text-sm">{row.reviewer_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {row.reviewer_gmail}
+                        {row.reviewer_gmail || "—"}
                       </p>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -153,7 +153,8 @@ export default function HistoryPage() {
                       {row.task?.app_name ?? "App"}
                     </p>
                     <p className="truncate text-sm text-muted-foreground">
-                      {row.reviewer_name} · {row.reviewer_gmail}
+                      {row.reviewer_name}
+                      {row.reviewer_gmail ? ` · ${row.reviewer_gmail}` : ""}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {formatDateTime(row.submitted_at)}

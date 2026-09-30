@@ -6,7 +6,7 @@ interface ApprovedRow {
   id: string;
   submitted_date: string;
   reviewer_name: string;
-  reviewer_gmail: string;
+  reviewer_gmail: string | null;
   screenshot_url: string;
   profiles: { sky_id: string; full_name: string | null } | null;
   tasks: { app_name: string } | null;
@@ -44,7 +44,7 @@ export async function syncApprovedToSheet(
     user_name: row.profiles!.full_name?.trim() || row.profiles!.sky_id,
     app_name: row.tasks!.app_name,
     reviewer_name: row.reviewer_name,
-    gmail: row.reviewer_gmail,
+    gmail: row.reviewer_gmail ?? "",
     screenshot_link: row.screenshot_url,
   }));
 

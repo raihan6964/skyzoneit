@@ -53,7 +53,7 @@ create table public.submissions (
   user_id           uuid not null references public.profiles (id) on delete cascade,
   task_id           uuid not null references public.tasks (id) on delete cascade,
   reviewer_name     text not null,
-  reviewer_gmail    text not null,
+  reviewer_gmail    text,
   screenshot_url    text not null,
   status            text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
   submitted_date    date not null,
@@ -412,7 +412,9 @@ begin
     screenshot_url, submitted_date, reward
   )
   values (
-    v_uid, v_task.id, trim(p_reviewer_name), lower(trim(p_reviewer_gmail)),
+    v_uid, v_task.id, trim(p_reviewer_name),
+    case when trim(coalesce(p_reviewer_gmail, '')) = '' then null
+         else lower(trim(p_reviewer_gmail)) end,
     p_screenshot_url, public.dhaka_today(), v_task.reward
   )
   returning * into v_submission;

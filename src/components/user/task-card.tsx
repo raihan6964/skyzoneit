@@ -357,11 +357,11 @@ function SubmitDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor={`gmail-${task.id}`}>Reviewer Gmail</Label>
+            <Label htmlFor={`gmail-${task.id}`}>Reviewer Gmail (optional)</Label>
             <Input
               id={`gmail-${task.id}`}
               type="email"
-              placeholder="reviewer@gmail.com"
+              placeholder="Leave empty if you don't have one"
               {...register("reviewer_gmail")}
             />
             {errors.reviewer_gmail && (

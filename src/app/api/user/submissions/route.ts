@@ -35,6 +35,9 @@ export async function POST(request: NextRequest) {
     const { supabase, profile } = await requireUser();
 
     const body = await request.json();
+    if (body && (body.reviewer_gmail === undefined || body.reviewer_gmail === null)) {
+      body.reviewer_gmail = "";
+    }
     const parsed = submissionSchema.safeParse(body);
     if (!parsed.success) {
       throw new ApiError(parsed.error.issues[0]?.message ?? "Invalid input");
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
       await supabase.rpc("create_submission", {
         p_task_id: task_id,
         p_reviewer_name: parsed.data.reviewer_name,
-        p_reviewer_gmail: parsed.data.reviewer_gmail,
+        p_reviewer_gmail: parsed.data.reviewer_gmail || null,
         p_screenshot_url: screenshotUrl,
       })
     );
