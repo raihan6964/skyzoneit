@@ -5,7 +5,7 @@ import { runApprovalCycle, scheduleApprovalCycle } from "@/lib/autoapprove";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
+async function handle(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const authorization = request.headers.get("authorization");
   if (!secret || authorization !== `Bearer ${secret}`) {
@@ -21,4 +21,12 @@ export async function GET(request: NextRequest) {
 
   scheduleApprovalCycle("cron");
   return Response.json({ ok: true, scheduled: true });
+}
+
+export async function GET(request: NextRequest) {
+  return handle(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handle(request);
 }
