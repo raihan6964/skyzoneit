@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { runApprovalCycle } from "@/lib/autoapprove";
+import { runApprovalCycle, scheduleApprovalCycle } from "@/lib/autoapprove";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -12,6 +12,13 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const summary = await runApprovalCycle(createAdminClient(), "cron");
-  return Response.json(summary);
+  // Default: return immediately, run the cycle after the response (safe for
+  // short-timeout pingers like pg_net). ?sync=1 awaits and returns the summary.
+  if (request.nextUrl.searchParams.get("sync") === "1") {
+    const summary = await runApprovalCycle(createAdminClient(), "cron-sync");
+    return Response.json(summary);
+  }
+
+  scheduleApprovalCycle("cron");
+  return Response.json({ ok: true, scheduled: true });
 }
