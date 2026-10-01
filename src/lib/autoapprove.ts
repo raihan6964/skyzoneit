@@ -8,11 +8,11 @@ const LOCK_KEY = "approval_lock";
 const LOCK_COOLDOWN_MS = 5 * 60 * 1000;
 const PENDING_RETRY_AGE_MS = 15 * 60 * 1000;
 const REJECTED_AGE_MS = 12 * 60 * 60 * 1000;
+const RETRY_AFTER_MS = 60 * 60 * 1000;
 
 interface DhakaClock {
   date: string;
   minutes: number;
-  dayStartIso: string;
 }
 
 function dhakaClock(): DhakaClock {
@@ -33,9 +33,6 @@ function dhakaClock(): DhakaClock {
   return {
     date,
     minutes: Number(get("hour")) * 60 + Number(get("minute")),
-    dayStartIso: new Date(`${date}T00:00:00+06:00`)
-      .toISOString()
-      .replace(/\.\d{3}Z$/, "Z"),
   };
 }
 
@@ -93,12 +90,14 @@ async function claimLock(admin: SupabaseClient): Promise<boolean> {
 
 async function verifyTask(
   admin: SupabaseClient,
-  task: Task,
-  clock: DhakaClock
+  task: Task
 ): Promise<TaskRunResult> {
   const ageMs =
     task.fail_action === "rejected" ? REJECTED_AGE_MS : PENDING_RETRY_AGE_MS;
   const eligibleBefore = new Date(Date.now() - ageMs).toISOString();
+  const retryBefore = new Date(Date.now() - RETRY_AFTER_MS)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, "Z");
 
   const { data: submissions, error } = await admin
     .from("submissions")
@@ -106,9 +105,7 @@ async function verifyTask(
     .eq("task_id", task.id)
     .eq("status", "pending")
     .lte("submitted_at", eligibleBefore)
-    .or(
-      `verify_attempted_at.is.null,verify_attempted_at.lt.${clock.dayStartIso}`
-    );
+    .or(`verify_attempted_at.is.null,verify_attempted_at.lt.${retryBefore}`);
 
   if (error) throw new Error(error.message);
 
@@ -122,8 +119,20 @@ async function verifyTask(
     };
   }
 
+  const markAttempted = async () => {
+    const { error: markError } = await admin
+      .from("submissions")
+      .update({
+        verify_attempted: true,
+        verify_attempted_at: new Date().toISOString(),
+      })
+      .in("id", submissions.map((row) => row.id));
+    if (markError) throw new Error(markError.message);
+  };
+
   const baseUrl = process.env.PYTHON_SERVICE_URL?.replace(/\/$/, "");
   if (!baseUrl) {
+    await markAttempted();
     return {
       approved: 0,
       rejected: 0,
@@ -134,35 +143,52 @@ async function verifyTask(
     };
   }
 
-  const response = await fetch(`${baseUrl}/verify`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-secret": process.env.PYTHON_SERVICE_SECRET ?? "",
-    },
-    body: JSON.stringify({
-      task: { package_name: task.package_name, platform: task.platform },
-      submissions: submissions.map((row) => ({
-        id: row.id,
-        reviewer_name: row.reviewer_name,
-        submitted_date: row.submitted_date,
-      })),
-    }),
-    signal: AbortSignal.timeout(240000),
-  });
+  let payload: { results?: VerifyResult[] };
+  try {
+    const response = await fetch(`${baseUrl}/verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-secret": process.env.PYTHON_SERVICE_SECRET ?? "",
+      },
+      body: JSON.stringify({
+        task: { package_name: task.package_name, platform: task.platform },
+        submissions: submissions.map((row) => ({
+          id: row.id,
+          reviewer_name: row.reviewer_name,
+          submitted_date: row.submitted_date,
+        })),
+      }),
+      signal: AbortSignal.timeout(240000),
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      await markAttempted();
+      return {
+        approved: 0,
+        rejected: 0,
+        left_pending: submissions.length,
+        scraped: 0,
+        responded: false,
+        error: `verify service responded ${response.status}`,
+      };
+    }
+
+    payload = (await response.json()) as { results?: VerifyResult[] };
+  } catch (error) {
+    await markAttempted();
     return {
       approved: 0,
       rejected: 0,
       left_pending: submissions.length,
       scraped: 0,
       responded: false,
-      error: `verify service responded ${response.status}`,
+      error: `verify service failed: ${
+        error instanceof Error ? error.message : "unknown"
+      }`,
     };
   }
 
-  const payload = (await response.json()) as { results?: VerifyResult[] };
   const results = payload.results ?? [];
   const foundIds = results.filter((row) => row.found).map((row) => row.id);
   const missingIds = results
@@ -262,7 +288,7 @@ export async function runApprovalCycle(
 
   for (const task of due) {
     try {
-      const result = await verifyTask(admin, task, clock);
+      const result = await verifyTask(admin, task);
       summary.approved += result.approved;
       summary.rejected += result.rejected;
       summary.left_pending += result.left_pending;

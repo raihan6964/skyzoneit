@@ -1,11 +1,13 @@
 import type { NextRequest } from "next/server";
 import { withApi, requireAdmin } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { scheduleApprovalCycle } from "@/lib/autoapprove";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
-  return withApi(async () => {
+  const response = await withApi(async () => {
     await requireAdmin();
     const admin = createAdminClient();
 
@@ -63,4 +65,7 @@ export async function GET(request: NextRequest) {
       page_size: pageSize,
     });
   });
+
+  if (response.ok) scheduleApprovalCycle("admin-submissions");
+  return response;
 }

@@ -1,13 +1,15 @@
 import type { NextRequest } from "next/server";
 import { withApi, requireUser, unwrap } from "@/lib/api";
 import { ApiError } from "@/lib/error";
+import { scheduleApprovalCycle } from "@/lib/autoapprove";
 import { withdrawSchema } from "@/lib/validations";
 import type { Withdrawal } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function GET() {
-  return withApi(async () => {
+  const response = await withApi(async () => {
     const { supabase } = await requireUser();
     const { data, error } = await supabase
       .from("withdrawals")
@@ -17,6 +19,9 @@ export async function GET() {
     if (error) throw new Error(error.message);
     return Response.json({ withdrawals: data ?? [] });
   });
+
+  if (response.ok) scheduleApprovalCycle("user-withdrawals");
+  return response;
 }
 
 export async function POST(request: NextRequest) {
