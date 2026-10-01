@@ -2,10 +2,12 @@ import type { NextRequest } from "next/server";
 import { withApi, requireUser, unwrap } from "@/lib/api";
 import { ApiError } from "@/lib/error";
 import { uploadImageToImgbb } from "@/lib/imgbb";
+import { scheduleApprovalCycle } from "@/lib/autoapprove";
 import { submissionSchema } from "@/lib/validations";
 import type { Submission } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  return withApi(async () => {
+  const response = await withApi(async () => {
     const { supabase, profile } = await requireUser();
 
     const body = await request.json();
@@ -71,4 +73,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({ submission: submission as Submission }, { status: 201 });
   });
+
+  if (response.ok) scheduleApprovalCycle("user-submission");
+  return response;
 }

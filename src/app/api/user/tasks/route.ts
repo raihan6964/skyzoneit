@@ -1,11 +1,13 @@
 import { withApi, requireUser } from "@/lib/api";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { scheduleApprovalCycle } from "@/lib/autoapprove";
 import type { UserTask } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function GET() {
-  return withApi(async () => {
+  const response = await withApi(async () => {
     const { profile } = await requireUser();
     const admin = createAdminClient();
 
@@ -80,4 +82,7 @@ export async function GET() {
 
     return Response.json({ tasks: result });
   });
+
+  if (response.ok) scheduleApprovalCycle("user-tasks");
+  return response;
 }

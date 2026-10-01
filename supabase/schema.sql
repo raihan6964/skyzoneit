@@ -62,6 +62,7 @@ create table public.submissions (
   verified_by       text check (verified_by is null or verified_by in ('admin', 'cron')),
   reward            numeric(10, 2) not null default 0,
   verify_attempted  boolean not null default false,
+  verify_attempted_at timestamptz,
   rejection_reason  text,
   synced_to_sheet   boolean not null default false
 );
@@ -101,6 +102,7 @@ values
   ('verify_tz', '"Asia/Dhaka"'::jsonb),
   ('auto_sync_sheets', 'true'::jsonb),
   ('admin_emails', '["skyzoneitltd@gmail.com"]'::jsonb),
+  ('approval_lock', '{"locked_at": "1970-01-01T00:00:00Z"}'::jsonb),
   ('access_test', '{
     "notice": "এই প্রশ্নের উত্তর ভিডিওতে সরাসরি শব্দে শব্দে বলা হয়নি, কিন্তু ভিডিওতে বুঝিয়ে দেওয়া হয়েছে। তাই আপনি যা বুঝতে পারেন তার ভিত্তিতে উত্তর দিন।\n\nকিন্তু কোনোভাবেই গ্রুপের কেউ থেকে উত্তর জিজ্ঞেস করবেন না। যদি কেউকে ডিস্টার্ব করেন, উত্তর জিজ্ঞেস করেন, বা চিটিং করে উত্তর জানার চেষ্টা করেন — তাহলে গ্রুপ থেকে ব্যান করা হবে এবং কাজও দেওয়া হবে না।\n\nমনে রাখবেন: আপনি চাইলে কারো কাছে কাজটা একটু বুঝে নিতে পারেন, কিন্তু সরাসরি উত্তর জিজ্ঞেস করা যাবে না।",
     "questions": [

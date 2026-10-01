@@ -12,7 +12,7 @@ A full-stack platform where users complete app-review tasks, submit screenshots,
 | Screenshots | imgbb (via server-side `/api/upload` proxy — key never exposed) |
 | Verification | Python FastAPI service (`python-service/`, separate deploy) |
 | Sheets sync | Google Apps Script web app (`google-apps-script/Code.gs`) |
-| Automation | Vercel Cron → `/api/cron/verify` (daily 00:20 Asia/Dhaka, Hobby-safe) |
+| Automation | Per-task approval start time + `/api/cron/verify` daily cron + background checks on user traffic |
 | Hosting | Vercel (Next.js + Python service) |
 
 ## Project structure
@@ -78,7 +78,7 @@ pytest                # tests (env: VERIFY_URL, PYTHON_SERVICE_SECRET)
 1. Import repo → Vercel → Framework: Next.js.
 2. Add all env vars above.
 3. `PYTHON_SERVICE_URL` → your Python deployment's root URL (the app calls `/verify`).
-4. `vercel.json` schedules `GET /api/cron/verify` daily at **00:20 Asia/Dhaka** (Bearer `CRON_SECRET`). Vercel Hobby only allows one cron run per day — the route runs every active app once per day and backfills missed days automatically. On Pro, switch to hourly (`15 * * * *`), or trigger it manually: `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>.vercel.app/api/cron/verify`.
+4. **Auto-approval** runs whenever the current Asia/Dhaka time passes each task's **approval start time** (`tasks.cron_time`). Checks are triggered three ways: background piggybacked on user traffic (`/api/user/profile`, `/api/user/tasks`, `/api/user/submissions` — throttled to one cycle per 3 minutes), the daily Vercel cron at **00:20 Asia/Dhaka** (Bearer `CRON_SECRET`), or manually: `curl -H "Authorization: Bearer $CRON_SECRET" https://<app>.vercel.app/api/cron/verify`. Pending rows are re-checked daily (15-minute age grace for `fail_action=pending`, 12-hour for `rejected`). For 24/7 accuracy without traffic, add an external every-minute hit (e.g. cron-job.org) calling the same URL with the Bearer secret.
 
 **Python service**
 1. New Vercel project with Root Directory = `python-service/`.
@@ -98,7 +98,7 @@ pytest                # tests (env: VERIFY_URL, PYTHON_SERVICE_SECRET)
 
 **User flow:** signup (gets `sky-XXXX` ID) → pick a task → generate an AI review (Groq, per-task admin prompt) → publish on Play Store/App Store → upload screenshot (`/api/upload` → imgbb) → submission created with `submitted_date` (Asia/Dhaka) → daily per-task limit enforced race-safe via `create_submission` RPC.
 
-**Verification loop:** daily cron (with Dhaka-time catch-up for missed runs) finds pending submissions from previous days, sends them to the Python `/verify` service (Play Store + App Store web review matching), then auto-approves or auto-rejects per each task's `fail_action` setting, and back-syncs approved rows to Google Sheets.
+**Verification loop:** once the daily Asia/Dhaka clock passes a task's approval start time, each approval cycle finds eligible pending submissions (not yet attempted today, past the age grace), sends them to the Python `/verify` service (Play Store + App Store web review matching), then auto-approves or auto-rejects per each task's `fail_action` setting, and back-syncs approved rows to Google Sheets. Cycles are triggered by user traffic (throttled), the daily cron, or manual calls.
 
 **Earnings:** approval credits `profiles.balance` inside the `approve_submissions` RPC. Users request withdrawals (bKash, min configurable via `app_settings`); admin pays manually and sets status.
 

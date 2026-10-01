@@ -43,7 +43,7 @@ const FEATURES = [
     icon: CalendarClock,
     title: "Smart scheduling",
     description:
-      "Admins set daily global limits and cron times per app. Everything runs automatically in the background.",
+      "Admins set daily global limits and approval start times per app. Reviews are auto-approved in the background.",
   },
   {
     icon: Users,

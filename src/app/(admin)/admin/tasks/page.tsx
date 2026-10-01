@@ -103,7 +103,9 @@ export default function AdminTasksPage() {
               <TableHead className="hidden sm:table-cell text-right">
                 Daily limit
               </TableHead>
-              <TableHead className="hidden lg:table-cell">Cron time</TableHead>
+              <TableHead className="hidden lg:table-cell">
+                Approval start
+              </TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -175,6 +177,7 @@ export default function AdminTasksPage() {
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground lg:table-cell">
                     {formatCron(task.cron_time)}
+                    <span className="block text-xs">auto-approve</span>
                     {(task.start_time || task.end_time) && (
                       <span className="block text-xs font-medium text-primary">
                         {formatDailyWindow(task.start_time, task.end_time)}

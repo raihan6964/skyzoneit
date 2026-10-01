@@ -56,6 +56,7 @@ export interface Submission {
   verified_by: "admin" | "cron" | null;
   reward: number;
   verify_attempted: boolean;
+  verify_attempted_at: string | null;
   rejection_reason: string | null;
   synced_to_sheet: boolean;
 }

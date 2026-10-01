@@ -1,9 +1,11 @@
 import { withApi, requireUser } from "@/lib/api";
+import { scheduleApprovalCycle } from "@/lib/autoapprove";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function GET() {
-  return withApi(async () => {
+  const response = await withApi(async () => {
     const { supabase, profile } = await requireUser();
 
     const [{ data: transactions }, { data: settings }] = await Promise.all([
@@ -29,4 +31,7 @@ export async function GET() {
         typeof minWithdrawal === "number" ? minWithdrawal : 50,
     });
   });
+
+  if (response.ok) scheduleApprovalCycle("user-profile");
+  return response;
 }
