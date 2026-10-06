@@ -42,6 +42,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatDateTime, formatTK } from "@/lib/format";
 import { postJson, useApi } from "@/lib/hooks";
 import type { Withdrawal, WithdrawalStatus } from "@/lib/types";
+import { rowFee, rowNet } from "@/lib/withdraw";
 
 const PAGE_SIZE = 25;
 
@@ -140,9 +141,9 @@ export default function AdminWithdrawalsPage() {
   const paidDescription =
     actionRow && action?.status === "paid"
       ? `Confirm you have sent ${formatTK(
-          actionRow.amount - (actionRow.fee ?? 0)
-        )} (after a ${formatTK(
-          actionRow.fee ?? 0
+          rowNet(actionRow)
+        )} (requested ${formatTK(actionRow.amount)} minus a ${formatTK(
+          rowFee(actionRow)
         )} withdrawal fee) to the worker's bKash number. The request is then closed.`
       : actionCopy?.description;
 
@@ -188,7 +189,7 @@ export default function AdminWithdrawalsPage() {
               <TableHead>Requested</TableHead>
               <TableHead>User</TableHead>
               <TableHead>bKash number</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="text-right">Payable</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -266,11 +267,11 @@ export default function AdminWithdrawalsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <p className="font-semibold tabular-nums">
-                      {formatTK(row.amount)}
+                      {formatTK(rowNet(row))}
                     </p>
                     <p className="text-xs text-muted-foreground tabular-nums">
-                      Fee {formatTK(row.fee ?? 0)} · Pays{" "}
-                      {formatTK(row.amount - (row.fee ?? 0))}
+                      Requested {formatTK(row.amount)} · Fee{" "}
+                      {formatTK(rowFee(row))}
                     </p>
                   </TableCell>
                   <TableCell>

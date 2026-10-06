@@ -28,6 +28,7 @@ import { formatDateTime, formatTK } from "@/lib/format";
 import { postJson, useApi } from "@/lib/hooks";
 import type { Profile, Withdrawal } from "@/lib/types";
 import { withdrawSchema, type WithdrawInput } from "@/lib/validations";
+import { rowFee, rowNet, withdrawalFee } from "@/lib/withdraw";
 
 export default function WithdrawPage() {
   const [submitting, setSubmitting] = useState(false);
@@ -60,7 +61,7 @@ export default function WithdrawPage() {
   const methodValue = useWatch({ control, name: "method" });
 
   const amountNum = Number(amountValue ?? 0) || 0;
-  const previewFee = amountNum > 0 ? (amountNum >= 1000 ? 10 : 5) : 0;
+  const previewFee = withdrawalFee(amountNum);
   const receiveAmount = Math.max(amountNum - previewFee, 0);
 
   const onSubmit = async (values: WithdrawInput) => {
@@ -75,7 +76,13 @@ export default function WithdrawPage() {
         bkash_number: values.bkash_number,
         amount: Number(values.amount),
       });
-      toast.success("Withdrawal request submitted!");
+      const fee = withdrawalFee(Number(values.amount));
+      const receive = Number(values.amount) - fee;
+      toast.success(
+        `Withdrawal requested — fee ${formatTK(fee)}, you receive ${formatTK(
+          receive
+        )}`
+      );
       reset({ method: "bkash" });
       await Promise.all([mutateProfile(), mutateWithdrawals()]);
     } catch (error) {
@@ -138,13 +145,14 @@ export default function WithdrawPage() {
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium">
-                        {formatTK(row.amount)}
+                        {formatTK(rowNet(row))}
                         <span className="ml-1 font-normal text-muted-foreground">
-                          → {formatTK(row.amount - (row.fee ?? 0))}
+                          received
                         </span>
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        Fee {formatTK(row.fee ?? 0)} · {row.bkash_number} ·{" "}
+                        Request {formatTK(row.amount)} · Fee{" "}
+                        {formatTK(rowFee(row))} · {row.bkash_number} ·{" "}
                         {formatDateTime(row.created_at)}
                       </p>
                     </div>
@@ -160,7 +168,10 @@ export default function WithdrawPage() {
           <CardHeader>
             <CardTitle>New withdrawal request</CardTitle>
             <CardDescription>
-              Requests are reviewed and paid manually via bKash.
+              Requests are reviewed and paid manually via bKash. Withdrawal fee:{" "}
+              {formatTK(5)} under {formatTK(1000)}, {formatTK(10)} for{" "}
+              {formatTK(1000)} or more — deducted from the amount, you receive
+              the rest.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -222,26 +233,26 @@ export default function WithdrawPage() {
                     </button>
                   ))}
                 </div>
-                {amountNum > 0 && (
-                  <div className="space-y-1 rounded-lg border bg-muted/40 px-3 py-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        Withdrawal fee
-                      </span>
-                      <span className="font-medium">
-                        {formatTK(previewFee)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">
-                        You receive
-                      </span>
-                      <span className="font-semibold text-primary">
-                        {formatTK(receiveAmount)}
-                      </span>
-                    </div>
+                <div className="space-y-1.5 rounded-lg border bg-muted/40 px-3 py-2.5 text-xs">
+                  <p className="text-muted-foreground">
+                    Fee: {formatTK(5)} under {formatTK(1000)} · {formatTK(10)}{" "}
+                    for {formatTK(1000)} or more
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      Withdrawal fee
+                    </span>
+                    <span className="font-medium">
+                      {amountNum > 0 ? formatTK(previewFee) : "—"}
+                    </span>
                   </div>
-                )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">You receive</span>
+                    <span className="font-semibold text-primary">
+                      {amountNum > 0 ? formatTK(receiveAmount) : "—"}
+                    </span>
+                  </div>
+                </div>
                 {Number(amountValue) > balance && (
                   <p className="text-xs text-destructive">
                     Amount exceeds your available balance

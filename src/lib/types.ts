@@ -72,7 +72,7 @@ export interface Withdrawal {
   method: "bkash";
   bkash_number: string;
   amount: number;
-  fee: number;
+  fee?: number | null;
   status: WithdrawalStatus;
   note: string | null;
   created_at: string;
