@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { mutate } from "swr";
 import {
   BadgeCheck,
@@ -11,6 +12,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { BalanceBreakdownDialog } from "@/components/admin/balance-breakdown-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { SubmissionsChart } from "@/components/admin/submissions-chart";
 import { StatusBadge } from "@/components/status-badge";
@@ -27,6 +29,7 @@ import {
 import { formatDateTime, formatTK } from "@/lib/format";
 import { useApi } from "@/lib/hooks";
 import type { CrmStats } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface RecentItem {
   id: string;
@@ -43,19 +46,31 @@ interface StatsResponse {
   recent: RecentItem[];
 }
 
+interface StatCard {
+  label: string;
+  value: string;
+  note: string;
+  icon: typeof Wallet;
+  highlight?: boolean;
+  onClick?: () => void;
+}
+
 export default function AdminDashboardPage() {
+  const [balancesOpen, setBalancesOpen] = useState(false);
+
   const { data, error, isLoading, isValidating } =
     useApi<StatsResponse>("/api/admin/stats", { refreshInterval: 15000 });
 
   const stats = data?.stats;
 
-  const cards = [
+  const cards: StatCard[] = [
     {
       label: "Total System Balance",
       value: stats ? formatTK(stats.system_balance) : "—",
       note: "Held across all worker wallets",
       icon: Wallet,
       highlight: true,
+      onClick: () => setBalancesOpen(true),
     },
     {
       label: "Total Users",
@@ -119,7 +134,26 @@ export default function AdminDashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-xl border bg-card p-4">
+          <div
+            key={card.label}
+            role={card.onClick ? "button" : undefined}
+            tabIndex={card.onClick ? 0 : undefined}
+            onClick={card.onClick}
+            onKeyDown={(event) => {
+              if (
+                card.onClick &&
+                (event.key === "Enter" || event.key === " ")
+              ) {
+                event.preventDefault();
+                card.onClick();
+              }
+            }}
+            className={cn(
+              "rounded-xl border bg-card p-4",
+              card.onClick &&
+                "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary"
+            )}
+          >
             <div className="flex items-start justify-between gap-3">
               <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <card.icon className="size-4.5" />
@@ -135,10 +169,20 @@ export default function AdminDashboardPage() {
                 </span>
               )}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">{card.label}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {card.label}
+              {card.onClick ? (
+                <span className="text-primary"> · click to view wallets</span>
+              ) : null}
+            </p>
           </div>
         ))}
       </div>
+
+      <BalanceBreakdownDialog
+        open={balancesOpen}
+        onOpenChange={setBalancesOpen}
+      />
 
       <div className="rounded-xl border bg-card p-4 sm:p-5">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
