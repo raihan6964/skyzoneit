@@ -100,7 +100,7 @@ pytest                # tests (env: VERIFY_URL, PYTHON_SERVICE_SECRET)
 
 **Verification loop:** once the daily Asia/Dhaka clock passes a task's approval start time, each approval cycle finds eligible pending submissions (age grace passed, not attempted within the last hour), sends them to the Python `/verify` service (Play Store + App Store web review matching), then auto-approves or auto-rejects per each task's `fail_action` setting, and back-syncs approved rows to Google Sheets. Cycles are triggered every 5 minutes by GitHub Actions, plus user/admin traffic and the daily cron.
 
-**Earnings:** approval credits `profiles.balance` inside the `approve_submissions` RPC. Users request withdrawals (bKash, min configurable via `app_settings`); admin pays manually and sets status.
+**Earnings:** approval credits `profiles.balance` inside the `approve_submissions` RPC. Users request withdrawals (bKash, min configurable via `app_settings`); admin pays manually and sets status. Each request carries a withdrawal fee stored in `withdrawals.fee` — 5 TK below 1000 TK, 10 TK for 1000 TK and above — deducted from the payout, so the user receives `amount - fee` while the balance is debited gross.
 
 **Admin panel:** stats dashboard, user management (credit/debit, suspend, role), task CRUD (prompt, reward, platform, per-task `fail_action`, start/end), submissions review (screenshot viewer, single/bulk approve/reject), withdrawal management.
 

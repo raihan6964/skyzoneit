@@ -73,6 +73,7 @@ create table public.withdrawals (
   method        text not null default 'bkash' check (method in ('bkash')),
   bkash_number  text not null check (bkash_number ~ '^01[3-9][0-9]{8}$'),
   amount        numeric(10, 2) not null check (amount >= 50),
+  fee           numeric(10, 2) not null default 0 check (fee >= 0),
   status        text not null default 'pending' check (status in ('pending', 'paid', 'cancelled')),
   note          text,
   created_at    timestamptz not null default now(),
@@ -645,6 +646,7 @@ declare
   v_uid         uuid := auth.uid();
   v_profile     public.profiles%rowtype;
   v_min         numeric;
+  v_fee         numeric;
   v_withdrawal  public.withdrawals%rowtype;
 begin
   if v_uid is null then
@@ -673,12 +675,17 @@ begin
     raise exception 'Insufficient balance';
   end if;
 
+  -- Withdrawal fee: 5 TK below 1000 TK, 10 TK for 1000 TK and above.
+  -- `amount` is the gross request (debited from balance);
+  -- the user receives amount - fee.
+  v_fee := case when p_amount >= 1000 then 10 else 5 end;
+
   update public.profiles
   set balance = balance - p_amount
   where id = v_uid and balance >= p_amount;
 
-  insert into public.withdrawals (user_id, bkash_number, amount)
-  values (v_uid, p_bkash_number, p_amount)
+  insert into public.withdrawals (user_id, bkash_number, amount, fee)
+  values (v_uid, p_bkash_number, p_amount, v_fee)
   returning * into v_withdrawal;
 
   insert into public.balance_transactions (user_id, type, amount, reason, ref_id, balance_after)

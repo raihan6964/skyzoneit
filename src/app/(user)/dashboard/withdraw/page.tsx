@@ -59,6 +59,10 @@ export default function WithdrawPage() {
   const amountValue = useWatch({ control, name: "amount" });
   const methodValue = useWatch({ control, name: "method" });
 
+  const amountNum = Number(amountValue ?? 0) || 0;
+  const previewFee = amountNum > 0 ? (amountNum >= 1000 ? 10 : 5) : 0;
+  const receiveAmount = Math.max(amountNum - previewFee, 0);
+
   const onSubmit = async (values: WithdrawInput) => {
     if (Number(values.amount) < minWithdrawal) {
       toast.error(`Minimum withdrawal is ${formatTK(minWithdrawal)}`);
@@ -91,6 +95,8 @@ export default function WithdrawPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Cash out your balance to bKash — minimum {formatTK(minWithdrawal)}.
+          Withdrawal fee is {formatTK(5)} under {formatTK(1000)} and{" "}
+          {formatTK(10)} for {formatTK(1000)} or more.
         </p>
       </div>
 
@@ -133,9 +139,13 @@ export default function WithdrawPage() {
                     <div className="min-w-0">
                       <p className="text-sm font-medium">
                         {formatTK(row.amount)}
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          → {formatTK(row.amount - (row.fee ?? 0))}
+                        </span>
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {row.bkash_number} · {formatDateTime(row.created_at)}
+                        Fee {formatTK(row.fee ?? 0)} · {row.bkash_number} ·{" "}
+                        {formatDateTime(row.created_at)}
                       </p>
                     </div>
                     <StatusBadge status={row.status} />
@@ -212,6 +222,26 @@ export default function WithdrawPage() {
                     </button>
                   ))}
                 </div>
+                {amountNum > 0 && (
+                  <div className="space-y-1 rounded-lg border bg-muted/40 px-3 py-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">
+                        Withdrawal fee
+                      </span>
+                      <span className="font-medium">
+                        {formatTK(previewFee)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">
+                        You receive
+                      </span>
+                      <span className="font-semibold text-primary">
+                        {formatTK(receiveAmount)}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 {Number(amountValue) > balance && (
                   <p className="text-xs text-destructive">
                     Amount exceeds your available balance

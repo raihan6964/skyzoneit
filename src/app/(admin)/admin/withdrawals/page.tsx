@@ -136,6 +136,15 @@ export default function AdminWithdrawalsPage() {
   const rows = data?.withdrawals ?? [];
   const total = data?.total ?? 0;
   const actionCopy = action ? ACTION_COPY[action.status] : null;
+  const actionRow = action ? rows.find((row) => row.id === action.id) : null;
+  const paidDescription =
+    actionRow && action?.status === "paid"
+      ? `Confirm you have sent ${formatTK(
+          actionRow.amount - (actionRow.fee ?? 0)
+        )} (after a ${formatTK(
+          actionRow.fee ?? 0
+        )} withdrawal fee) to the worker's bKash number. The request is then closed.`
+      : actionCopy?.description;
 
   return (
     <div className="space-y-5">
@@ -255,8 +264,14 @@ export default function AdminWithdrawalsPage() {
                       </Tooltip>
                     </span>
                   </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">
-                    {formatTK(row.amount)}
+                  <TableCell className="text-right">
+                    <p className="font-semibold tabular-nums">
+                      {formatTK(row.amount)}
+                    </p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      Fee {formatTK(row.fee ?? 0)} · Pays{" "}
+                      {formatTK(row.amount - (row.fee ?? 0))}
+                    </p>
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={row.status} />
@@ -319,9 +334,7 @@ export default function AdminWithdrawalsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{actionCopy?.title}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {actionCopy?.description}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{paidDescription}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Back</AlertDialogCancel>
