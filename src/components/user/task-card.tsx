@@ -58,6 +58,10 @@ export function TaskCard({
 }) {
   const limitReached =
     task.daily_limit !== null && task.submitted_today >= task.daily_limit;
+  const userLimitReached =
+    typeof task.per_user_limit === "number" &&
+    task.per_user_limit > 0 &&
+    task.my_total >= task.per_user_limit;
   const windowLocked = task.lock_reason === "window";
   const progressValue =
     task.daily_limit !== null
@@ -86,7 +90,11 @@ export function TaskCard({
         {task.locked && (
           <span className="absolute right-2 top-2 flex items-center gap-1 rounded-md bg-amber-500/90 px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
             <Lock className="size-3" />
-            {windowLocked ? "Scheduled" : "Limit reached"}
+            {windowLocked
+              ? "Scheduled"
+              : userLimitReached
+                ? "Your limit reached"
+                : "Limit reached"}
           </span>
         )}
       </div>
@@ -123,6 +131,26 @@ export function TaskCard({
               <span className="sr-only">Daily progress</span>
             </Progress>
           )}
+          {typeof task.per_user_limit === "number" && task.per_user_limit > 0 && (
+            <>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Your submissions
+                </span>
+                <span className="font-medium tabular-nums">
+                  {task.my_total} / {task.per_user_limit}
+                </span>
+              </div>
+              <Progress
+                value={Math.min(
+                  100,
+                  (task.my_total / task.per_user_limit) * 100
+                )}
+              >
+                <span className="sr-only">Your limit progress</span>
+              </Progress>
+            </>
+          )}
         </div>
 
         <div className="mt-auto space-y-2 pt-1">
@@ -130,6 +158,7 @@ export function TaskCard({
           <SubmitDialog
             task={task}
             limitReached={limitReached}
+            userLimitReached={userLimitReached}
             windowLocked={windowLocked}
             onChanged={onChanged}
           />
@@ -183,6 +212,16 @@ function DetailsDialog({ task }: { task: UserTask }) {
                 {task.daily_limit ?? "Unlimited"}
               </dd>
             </div>
+            <div className="rounded-lg bg-muted/60 p-2.5">
+              <dt className="text-xs text-muted-foreground">
+                Per-user limit
+              </dt>
+              <dd className="font-semibold">
+                {typeof task.per_user_limit === "number"
+                  ? task.per_user_limit
+                  : "Unlimited"}
+              </dd>
+            </div>
             <div className="col-span-2 rounded-lg bg-muted/60 p-2.5">
               <dt className="text-xs text-muted-foreground">Schedule</dt>
               <dd className="font-medium">
@@ -219,11 +258,13 @@ function DetailsDialog({ task }: { task: UserTask }) {
 function SubmitDialog({
   task,
   limitReached,
+  userLimitReached,
   windowLocked,
   onChanged,
 }: {
   task: UserTask;
   limitReached: boolean;
+  userLimitReached: boolean;
   windowLocked: boolean;
   onChanged: () => void;
 }) {
@@ -310,11 +351,13 @@ function SubmitDialog({
         render={
           <Button
             className="w-full"
-            disabled={limitReached || windowLocked}
+            disabled={limitReached || windowLocked || userLimitReached}
           />
         }
       >
-        {limitReached ? (
+        {userLimitReached ? (
+          `Your limit reached (${task.my_total}/${task.per_user_limit})`
+        ) : limitReached ? (
           "Daily limit reached"
         ) : windowLocked ? (
           <>

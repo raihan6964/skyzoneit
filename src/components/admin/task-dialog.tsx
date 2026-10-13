@@ -51,6 +51,7 @@ const DEFAULT_VALUES: TaskFormValues = {
   banner_url: "",
   reward: 0,
   daily_limit: "",
+  per_user_limit: "",
   ai_prompt: "",
   cron_time: "21:00",
   fail_action: "pending",
@@ -107,6 +108,7 @@ export function TaskDialog({
             banner_url: current.banner_url ?? "",
             reward: current.reward,
             daily_limit: current.daily_limit ?? "",
+            per_user_limit: current.per_user_limit ?? "",
             ai_prompt: current.ai_prompt,
             cron_time: current.cron_time,
             fail_action: current.fail_action,
@@ -378,6 +380,27 @@ export function TaskDialog({
               {errors.daily_limit && (
                 <p className="text-xs text-destructive">
                   {errors.daily_limit.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="task-per-user-limit">Per-user limit</Label>
+              <Input
+                id="task-per-user-limit"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Unlimited"
+                {...register("per_user_limit")}
+              />
+              <p className="text-xs text-muted-foreground">
+                Max reviews each user may submit for this task (all time).
+                Leave empty for no per-user cap.
+              </p>
+              {errors.per_user_limit && (
+                <p className="text-xs text-destructive">
+                  {errors.per_user_limit.message}
                 </p>
               )}
             </div>

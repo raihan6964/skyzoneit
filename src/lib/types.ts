@@ -29,6 +29,7 @@ export interface Task {
   description: string | null;
   reward: number;
   daily_limit: number | null;
+  per_user_limit: number | null;
   ai_prompt: string;
   cron_time: string;
   fail_action: FailAction;
@@ -107,7 +108,7 @@ export interface UserTask extends Task {
   submitted_today: number;
   my_total: number;
   locked: boolean;
-  lock_reason: "window" | "limit" | null;
+  lock_reason: "window" | "limit" | "user_limit" | null;
 }
 
 export interface SheetRow {

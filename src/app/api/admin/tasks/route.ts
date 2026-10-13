@@ -26,6 +26,7 @@ function normalizeTaskInput(body: unknown) {
     banner_url: value.banner_url?.trim() || null,
     reward: value.reward,
     daily_limit: value.daily_limit,
+    per_user_limit: value.per_user_limit,
     ai_prompt: value.ai_prompt,
     cron_time: value.cron_time,
     fail_action: value.fail_action,

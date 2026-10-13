@@ -59,6 +59,7 @@ export async function PATCH(
       payload.banner_url = (value.banner_url ?? "").trim() || null;
     if (has("reward")) payload.reward = value.reward;
     if (has("daily_limit")) payload.daily_limit = value.daily_limit;
+    if (has("per_user_limit")) payload.per_user_limit = value.per_user_limit;
     if (has("ai_prompt")) payload.ai_prompt = value.ai_prompt;
     if (has("cron_time")) payload.cron_time = value.cron_time;
     if (has("fail_action")) payload.fail_action = value.fail_action;

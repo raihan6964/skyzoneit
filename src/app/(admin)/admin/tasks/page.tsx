@@ -174,6 +174,9 @@ export default function AdminTasksPage() {
                   </TableCell>
                   <TableCell className="hidden text-right tabular-nums text-muted-foreground sm:table-cell">
                     {task.daily_limit ?? "∞"}
+                    <span className="block text-xs">
+                      per user: {task.per_user_limit ?? "∞"}
+                    </span>
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground lg:table-cell">
                     {formatCron(task.cron_time)}

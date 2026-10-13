@@ -33,6 +33,7 @@ create table public.tasks (
   description       text,
   reward            numeric(10, 2) not null default 0 check (reward >= 0),
   daily_limit       integer check (daily_limit is null or daily_limit > 0),
+  per_user_limit    integer check (per_user_limit is null or per_user_limit > 0),
   ai_prompt         text not null default '',
   cron_time         time not null default '21:00',
   fail_action       text not null default 'rejected' check (fail_action in ('pending', 'rejected')),
@@ -407,6 +408,18 @@ begin
 
     if v_count >= v_task.daily_limit then
       raise exception 'Daily review limit reached for this app';
+    end if;
+  end if;
+
+  if v_task.per_user_limit is not null then
+    select count(*) into v_count
+    from public.submissions
+    where task_id = v_task.id
+      and user_id = v_uid;
+
+    if v_count >= v_task.per_user_limit then
+      raise exception 'You reached the limit of % reviews for this task',
+        v_task.per_user_limit;
     end if;
   end if;
 

@@ -102,7 +102,7 @@ pytest                # tests (env: VERIFY_URL, PYTHON_SERVICE_SECRET)
 
 **Earnings:** approval credits `profiles.balance` inside the `approve_submissions` RPC. Users request withdrawals (bKash, min configurable via `app_settings`); admin pays manually and sets status. Each request carries a withdrawal fee stored in `withdrawals.fee` — 5 TK below 1000 TK, 10 TK for 1000 TK and above — deducted from the payout, so the user receives `amount - fee` while the balance is debited gross.
 
-**Admin panel:** stats dashboard, user management (credit/debit, suspend, role), task CRUD (prompt, reward, platform, per-task `fail_action`, start/end), submissions review (screenshot viewer, single/bulk approve/reject), withdrawal management.
+**Admin panel:** stats dashboard, user management (credit/debit, suspend, role), task CRUD (prompt, reward, platform, per-task `fail_action`, daily global limit + optional per-user submission limit, start/end), submissions review (screenshot viewer, single/bulk approve/reject), withdrawal management.
 
 ## Security notes
 

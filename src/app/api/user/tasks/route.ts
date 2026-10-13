@@ -64,6 +64,7 @@ export async function GET() {
 
     const result: UserTask[] = visible.map((task) => {
       const today_cnt = countMap.get(task.id)?.today_cnt ?? 0;
+      const myTotal = countMap.get(task.id)?.my_cnt ?? 0;
       const opensAt = toSeconds(task.start_time);
       const closesAt = toSeconds(task.end_time);
       const inWindow =
@@ -71,12 +72,22 @@ export async function GET() {
         (closesAt === null || nowSeconds <= closesAt);
       const limitReached =
         task.daily_limit !== null && today_cnt >= task.daily_limit;
+      const userLimitReached =
+        typeof task.per_user_limit === "number" &&
+        task.per_user_limit > 0 &&
+        myTotal >= task.per_user_limit;
       return {
         ...task,
         submitted_today: today_cnt,
-        my_total: countMap.get(task.id)?.my_cnt ?? 0,
-        locked: !inWindow || limitReached,
-        lock_reason: !inWindow ? "window" : limitReached ? "limit" : null,
+        my_total: myTotal,
+        locked: !inWindow || limitReached || userLimitReached,
+        lock_reason: !inWindow
+          ? "window"
+          : limitReached
+            ? "limit"
+            : userLimitReached
+              ? "user_limit"
+              : null,
       };
     });
 
