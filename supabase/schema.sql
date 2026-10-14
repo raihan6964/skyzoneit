@@ -415,10 +415,11 @@ begin
     select count(*) into v_count
     from public.submissions
     where task_id = v_task.id
-      and user_id = v_uid;
+      and user_id = v_uid
+      and submitted_date = public.dhaka_today();
 
     if v_count >= v_task.per_user_limit then
-      raise exception 'You reached the limit of % reviews for this task',
+      raise exception 'You reached the daily limit of % reviews for this task',
         v_task.per_user_limit;
     end if;
   end if;
@@ -878,7 +879,7 @@ create or replace function public.task_board_counts(
   p_task_ids uuid[],
   p_user_id uuid
 )
-returns table (task_id uuid, today_cnt bigint, my_cnt bigint)
+returns table (task_id uuid, today_cnt bigint, my_cnt bigint, my_today bigint)
 language sql
 stable
 security definer
@@ -886,7 +887,11 @@ set search_path = public
 as $$
   select s.task_id,
          count(*) filter (where s.submitted_date = public.dhaka_today())::bigint,
-         count(*) filter (where s.user_id = p_user_id)::bigint
+         count(*) filter (where s.user_id = p_user_id)::bigint,
+         count(*) filter (
+           where s.user_id = p_user_id
+             and s.submitted_date = public.dhaka_today()
+         )::bigint
   from public.submissions s
   where s.task_id = any (p_task_ids)
   group by s.task_id;

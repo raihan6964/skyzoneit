@@ -107,6 +107,7 @@ export interface CrmStats {
 export interface UserTask extends Task {
   submitted_today: number;
   my_total: number;
+  my_today: number;
   locked: boolean;
   lock_reason: "window" | "limit" | "user_limit" | null;
 }

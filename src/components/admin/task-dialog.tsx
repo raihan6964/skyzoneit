@@ -395,8 +395,8 @@ export function TaskDialog({
                 {...register("per_user_limit")}
               />
               <p className="text-xs text-muted-foreground">
-                Max reviews each user may submit for this task (all time).
-                Leave empty for no per-user cap.
+                Max reviews each user may submit per day (Asia/Dhaka). Resets
+                at midnight. Leave empty for no per-user cap.
               </p>
               {errors.per_user_limit && (
                 <p className="text-xs text-destructive">

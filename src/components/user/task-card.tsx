@@ -61,7 +61,7 @@ export function TaskCard({
   const userLimitReached =
     typeof task.per_user_limit === "number" &&
     task.per_user_limit > 0 &&
-    task.my_total >= task.per_user_limit;
+    task.my_today >= task.per_user_limit;
   const windowLocked = task.lock_reason === "window";
   const progressValue =
     task.daily_limit !== null
@@ -135,16 +135,16 @@ export function TaskCard({
             <>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">
-                  Your submissions
+                  Your submissions today
                 </span>
                 <span className="font-medium tabular-nums">
-                  {task.my_total} / {task.per_user_limit}
+                  {task.my_today} / {task.per_user_limit}
                 </span>
               </div>
               <Progress
                 value={Math.min(
                   100,
-                  (task.my_total / task.per_user_limit) * 100
+                  (task.my_today / task.per_user_limit) * 100
                 )}
               >
                 <span className="sr-only">Your limit progress</span>
@@ -214,7 +214,7 @@ function DetailsDialog({ task }: { task: UserTask }) {
             </div>
             <div className="rounded-lg bg-muted/60 p-2.5">
               <dt className="text-xs text-muted-foreground">
-                Per-user limit
+                Per-user limit / day
               </dt>
               <dd className="font-semibold">
                 {typeof task.per_user_limit === "number"
@@ -356,7 +356,7 @@ function SubmitDialog({
         }
       >
         {userLimitReached ? (
-          `Your limit reached (${task.my_total}/${task.per_user_limit})`
+          `Daily limit reached (${task.my_today}/${task.per_user_limit})`
         ) : limitReached ? (
           "Daily limit reached"
         ) : windowLocked ? (

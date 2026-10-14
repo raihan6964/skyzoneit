@@ -39,16 +39,18 @@ export async function GET() {
 
     const countMap = new Map<
       string,
-      { today_cnt: number; my_cnt: number }
+      { today_cnt: number; my_cnt: number; my_today: number }
     >();
     for (const row of (counts ?? []) as Array<{
       task_id: string;
       today_cnt: number;
       my_cnt: number;
+      my_today: number;
     }>) {
       countMap.set(row.task_id, {
         today_cnt: Number(row.today_cnt),
         my_cnt: Number(row.my_cnt),
+        my_today: Number(row.my_today),
       });
     }
 
@@ -65,6 +67,7 @@ export async function GET() {
     const result: UserTask[] = visible.map((task) => {
       const today_cnt = countMap.get(task.id)?.today_cnt ?? 0;
       const myTotal = countMap.get(task.id)?.my_cnt ?? 0;
+      const myToday = countMap.get(task.id)?.my_today ?? 0;
       const opensAt = toSeconds(task.start_time);
       const closesAt = toSeconds(task.end_time);
       const inWindow =
@@ -75,11 +78,12 @@ export async function GET() {
       const userLimitReached =
         typeof task.per_user_limit === "number" &&
         task.per_user_limit > 0 &&
-        myTotal >= task.per_user_limit;
+        myToday >= task.per_user_limit;
       return {
         ...task,
         submitted_today: today_cnt,
         my_total: myTotal,
+        my_today: myToday,
         locked: !inWindow || limitReached || userLimitReached,
         lock_reason: !inWindow
           ? "window"
