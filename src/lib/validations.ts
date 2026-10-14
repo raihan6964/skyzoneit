@@ -94,7 +94,7 @@ const taskFormObject = z.object({
   reward: nonNegativeNumber,
   daily_limit: optionalPositiveInt,
   per_user_limit: optionalPositiveInt,
-  ai_prompt: z.string().trim().min(1, "AI prompt is required").max(4000),
+  ai_prompt: z.string().trim().min(1, "AI prompt is required"),
   cron_time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a time (e.g. 21:00)"),
   fail_action: z.enum(["pending", "rejected"]),
   start_at: optionalDateTime,
