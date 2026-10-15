@@ -50,7 +50,7 @@ Copy `.env.example` → `.env.local` and fill in:
 ```
 NEXT_PUBLIC_SUPABASE_URL=      NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=     ADMIN_EMAIL=
-GROQ_API_KEY=                  GROQ_MODEL=openai/gpt-oss-120b
+GROQ_API_KEY=                  GROQ_MODEL=openai/gpt-oss-20b
 IMGBB_API_KEY=
 SHEETS_WEBHOOK_URL=            # /exec URL from Apps Script
 PYTHON_SERVICE_URL=https://your-python-service.vercel.app  # service root; app calls /verify

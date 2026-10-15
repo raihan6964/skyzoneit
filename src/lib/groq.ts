@@ -5,6 +5,7 @@ function sanitizeReview(raw: string): string {
   let text = raw.trim();
   text = text.replace(/^```[a-zA-Z]*\s*/, "").replace(/\s*```$/, "").trim();
   text = text.replace(/\s+/g, " ").trim();
+  text = text.replace(/([,;:!?])(?=[^\s\d])/g, "$1 ");
   text = text.replace(/^(?:[-*•]\s+)+/, "");
   text = text.replace(/^\d{1,2}[.)]\s+/, "");
   text = text.replace(/^(?:review|output|result)\s*:\s*/i, "");
@@ -35,7 +36,7 @@ export async function generateReviewText(
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await client.chat.completions.create({
-        model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+        model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
         temperature: 0.9,
         max_tokens: 4096,
         reasoning_effort: "low",
@@ -141,7 +142,7 @@ export async function gradeAccessTest(
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await client.chat.completions.create({
-        model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+        model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
         temperature: 0,
         max_tokens: 2000,
         reasoning_effort: "low",
