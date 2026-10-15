@@ -19,13 +19,8 @@ const VARIATION_HINTS = [
   "Pick a reference or core idea that none of the recent reviews listed above appear to be based on.",
   "If your first instinct matches a recent review, switch to a completely different reference or idea.",
   "Choose the least-used looking idea from the admin's pool rather than the most obvious one.",
-  "Anchor the review in a specific moment (time of day, place, or situation).",
-  "Compare briefly with a similar app you used before, without naming it.",
-  "Include one small imperfection so the review reads honestly.",
-  "Mention recommending it to a friend or family member, and why.",
-  "Highlight something that surprised you more than you expected.",
-  "Describe value for money in your own natural words.",
-  "Keep it short and punchy with a strong first line.",
+  "Write it exactly as a casual real user would — natural words, nothing forced or word-swapped.",
+  "Vary the rhythm and opening (short punchy start vs a fuller sentence), keeping the wording natural.",
 ];
 
 const normalize = (value: string) =>
@@ -178,13 +173,13 @@ export async function POST(request: NextRequest) {
 
       if (isExactDuplicate(norm)) {
         feedback =
-          "Your previous output was identical or nearly identical to a review that already exists for this app. Keep following the admin instructions exactly as written, but write a completely different review with a different opening sentence, structure, vocabulary and phrasing.";
+          "Your previous output was identical or nearly identical to a review that already exists for this app. Do not word-swap an existing phrasing. Instead pick a different reference or core idea from the admin's pool (one the recent reviews do not appear to be based on) and write it naturally from scratch, following the admin instructions exactly.";
         continue;
       }
 
       const score = similarityToHistory(norm);
       if (score >= DUPLICATE_THRESHOLD && round < MAX_ROUNDS) {
-        feedback = `Your previous output was too similar to an existing review for this app (similarity ${score.toFixed(2)}). Keep following the admin instructions exactly as written, but rewrite with a completely different opening sentence, structure, vocabulary and phrasing.`;
+        feedback = `Your previous output was too similar to an existing review for this app (similarity ${score.toFixed(2)}). Do not swap individual words or change the subject to escape the match — choose a different reference or core idea from the admin's pool and write it naturally, following the admin instructions exactly.`;
         continue;
       }
 
@@ -203,7 +198,7 @@ export async function POST(request: NextRequest) {
         history = fresh.norms;
         recent = fresh.recent;
         feedback =
-          "Another user just claimed a very similar (or identical) review for this app, so yours was rejected as too close to an existing one. Write a clearly different review: new opening sentence, structure, vocabulary and details.";
+          "Another user just claimed a very similar (or identical) review for this app, so yours was rejected as too close to an existing one. Pick a different reference or core idea from the admin's pool and write it naturally — do not rearrange or word-swap the same phrasing, and do not change the subject.";
         continue;
       }
       if (rejected) break;

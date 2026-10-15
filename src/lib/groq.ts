@@ -10,6 +10,7 @@ function sanitizeReview(raw: string): string {
   text = text.replace(/^(?:review|output|result)\s*:\s*/i, "");
   const quoted = text.match(/^(["'“‘])([\s\S]*)(["'”’])$/);
   if (quoted) text = quoted[2].trim();
+  if (text) text = text.charAt(0).toUpperCase() + text.slice(1);
   return text;
 }
 
@@ -51,8 +52,10 @@ export async function generateReviewText(
               "- No surrounding quotation marks, no headings, no lists, no numbering, no labels, no markdown, no prefixes, no explanations.",
               "- Never mention AI, prompts, instructions, tasks, or tests.",
               "- Sound like a real human user: natural, specific, casual phrasing.",
+              "- Start the review with a capital letter.",
+              "- Natural wording beats novelty: never force in unusual synonyms, awkward phrasing, or mashed-together fragments just to sound different, and never change the subject or who the review is about (me stays me, not a friend or someone else).",
               "- Examples inside the instructions are style references only — never copy their wording.",
-              "- If recent reviews are listed, differ from ALL of them: different opening, structure, and vocabulary.",
+              "- If recent reviews are listed, differ from ALL of them by using a different idea/reference — not by swapping individual words of an existing phrasing. Keep every sentence natural.",
               "- If the admin instructions provide a pool of reference ideas, choose one that is clearly different from what the recent reviews listed below are based on — repeating a reference is the main cause of duplicate outputs.",
               "- If a variation hint is given, pick that angle/details for this run — only where it does not conflict with the admin instructions.",
               "- If retry feedback is given, fix exactly that problem and output only the corrected review.",
