@@ -10,8 +10,11 @@ export const dynamic = "force-dynamic";
 
 const HISTORY_LIMIT = 500;
 const PROMPT_EXAMPLES = 25;
+const RECENT_EXAMPLES = 15;
 const MAX_GENERATION_ATTEMPTS = 3;
-const DUPLICATE_THRESHOLD = 0.6;
+const MAX_SAVE_ATTEMPTS = 2;
+const DUPLICATE_THRESHOLD = 0.7;
+const EXACT_WINDOW = 40;
 
 const normalize = (value: string) =>
   value
@@ -50,9 +53,29 @@ function similarity(a: string, b: string): number {
   aPairs.forEach((pair) => {
     if (bPairs.has(pair)) sharedPairs += 1;
   });
-  const bigramRecall = aPairs.size > 0 ? sharedPairs / aPairs.size : 0;
+  const pairUnion = aPairs.size + bPairs.size - sharedPairs;
+  const pairJaccard = pairUnion > 0 ? sharedPairs / pairUnion : 0;
 
-  return Math.max(jaccard, bigramRecall);
+  const recallA = aPairs.size > 0 ? sharedPairs / aPairs.size : 0;
+  const recallB = bPairs.size > 0 ? sharedPairs / bPairs.size : 0;
+  const lengthRatio =
+    Math.min(aTokens.length, bTokens.length) /
+    Math.max(aTokens.length, bTokens.length);
+
+  return Math.max(jaccard, pairJaccard, lengthRatio * Math.min(recallA, recallB));
+}
+
+function pickExamples(reviews: string[]): string[] {
+  if (reviews.length <= PROMPT_EXAMPLES) return reviews;
+  const newest = reviews.slice(0, RECENT_EXAMPLES);
+  const older = reviews.slice(RECENT_EXAMPLES);
+  const needed = PROMPT_EXAMPLES - newest.length;
+  const step = Math.max(1, Math.floor(older.length / needed));
+  const spread: string[] = [];
+  for (let i = 0; i < older.length && spread.length < needed; i += step) {
+    spread.push(older[i]);
+  }
+  return [...newest, ...spread];
 }
 
 export async function POST(request: NextRequest) {
@@ -91,52 +114,99 @@ export async function POST(request: NextRequest) {
       throw new ApiError("Could not verify review uniqueness, please try again", 502);
     }
 
-    const history = (historyRows ?? []).map((row) => row.review);
-    const recent = history.slice(0, PROMPT_EXAMPLES);
-    const normalizedHistory = history
-      .map(normalize)
+    const rawHistory = (historyRows ?? [])
+      .map((row) => (row.review ?? "").trim())
       .filter((entry) => entry.length > 0);
+    const history = rawHistory.map(normalize).filter((entry) => entry.length > 0);
+    const recent = pickExamples(rawHistory);
 
-    const isDuplicate = (text: string) => {
-      const norm = normalize(text);
+    const isExactDuplicate = (norm: string) => {
       if (!norm) return true;
-      if (normalizedHistory.includes(norm)) return true;
-      if (norm.length >= 40) {
-        const contained = normalizedHistory.some(
-          (past) => past.length >= 40 && (past.includes(norm) || norm.includes(past))
+      if (history.includes(norm)) return true;
+      if (norm.length >= EXACT_WINDOW) {
+        return history.some(
+          (past) =>
+            past.length >= EXACT_WINDOW && (past.includes(norm) || norm.includes(past))
         );
-        if (contained) return true;
       }
-      return normalizedHistory.some((past) => similarity(norm, past) >= DUPLICATE_THRESHOLD);
+      return false;
+    };
+
+    const similarityToHistory = (norm: string) => {
+      let worst = 0;
+      for (const past of history) {
+        const score = similarity(norm, past);
+        if (score > worst) worst = score;
+        if (worst >= DUPLICATE_THRESHOLD) break;
+      }
+      return worst;
     };
 
     let review = "";
     let retryFeedback: string | undefined;
+    const candidates: Array<{ text: string; score: number }> = [];
 
     for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
-      review = await generateReviewText(
+      const text = await generateReviewText(
         task.ai_prompt,
         task.app_name,
         recent,
         retryFeedback
       );
-      if (!isDuplicate(review)) break;
+      const norm = normalize(text);
 
-      if (attempt === MAX_GENERATION_ATTEMPTS) {
-        throw new ApiError(
-          "AI returned a review too similar to an existing one, please try again",
-          502
-        );
+      if (isExactDuplicate(norm)) {
+        retryFeedback =
+          "Your previous output was identical or nearly identical to a review that already exists for this app. Keep following the admin instructions exactly as written, but write a completely different review with a different opening sentence, structure, vocabulary and phrasing.";
+        continue;
+      }
+
+      const score = similarityToHistory(norm);
+      if (score < DUPLICATE_THRESHOLD) {
+        review = text;
+        break;
+      }
+
+      candidates.push({ text, score });
+      if (attempt === MAX_GENERATION_ATTEMPTS && candidates.length > 0) {
+        // Never leave the user without a review: hand back the least similar
+        // candidate instead of failing (the DB guard still blocks verbatim repeats).
+        candidates.sort((left, right) => left.score - right.score);
+        review = candidates[0].text;
+        break;
       }
       retryFeedback =
         "Your previous output repeated or closely imitated a review that already exists for this app. Keep following the admin instructions exactly as written, but rewrite with a completely different opening sentence, structure, vocabulary and phrasing so it cannot be matched to any earlier review.";
     }
 
-    const { error: saveError } = await admin.rpc("save_review_history", {
-      p_task_id: task.id,
-      p_review: review,
-    });
-    if (saveError) {
+    if (!review) {
+      throw new ApiError(
+        "AI keeps returning a review that already exists, please try again",
+        502
+      );
+    }
+
+    let saveAttempts = 0;
+    for (;;) {
+      const { error: saveError } = await admin.rpc("save_review_history", {
+        p_task_id: task.id,
+        p_review: review,
+      });
+      if (!saveError) break;
+
+      if (/duplicate/i.test(saveError.message) && saveAttempts < MAX_SAVE_ATTEMPTS) {
+        saveAttempts += 1;
+        const fresh = await generateReviewText(
+          task.ai_prompt,
+          task.app_name,
+          recent,
+          "That exact review already exists for this app. Output a completely different review with different wording, opening and structure."
+        );
+        const norm = normalize(fresh);
+        if (norm && !isExactDuplicate(norm)) review = fresh;
+        continue;
+      }
+
       console.error("review_history save failed:", saveError.message);
       if (/duplicate/i.test(saveError.message)) {
         throw new ApiError(
