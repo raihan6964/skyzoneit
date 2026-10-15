@@ -3,6 +3,7 @@
 -- ============================================================================
 
 create extension if not exists pgcrypto;
+create extension if not exists pg_trgm;
 
 create sequence if not exists public.sky_id_seq start 1000;
 
@@ -913,6 +914,8 @@ as $$
 declare
   v_claims text := current_setting('request.jwt.claims', true);
   v_norm   text;
+  v_best   real;
+  v_span   real;
 begin
   if v_claims is not null and v_claims <> '' then
     if coalesce(v_claims::jsonb ->> 'role', '') not in ('service_role', 'postgres') then
@@ -921,8 +924,14 @@ begin
   end if;
 
   v_norm := lower(regexp_replace(coalesce(p_review, ''), '\s+', ' ', 'g'));
+  if v_norm = '' then
+    raise exception 'Empty review';
+  end if;
 
-  -- Concurrency guard: never record (or hand out) an identical review twice.
+  -- Serialize all claims for this task: no check/insert race between users.
+  perform pg_advisory_xact_lock(hashtextextended('review_claim:' || p_task_id::text, 0));
+
+  -- Verbatim duplicate.
   if exists (
     select 1
     from public.review_history
@@ -930,6 +939,24 @@ begin
       and lower(regexp_replace(review, '\s+', ' ', 'g')) = v_norm
   ) then
     raise exception 'Duplicate review: regeneration required';
+  end if;
+
+  -- Near-clone wording (only meaningful for reviews long enough to compare).
+  if length(v_norm) >= 12 then
+    select max(similarity(lower(regexp_replace(review, '\s+', ' ', 'g')), v_norm)),
+           max(greatest(
+             word_similarity(lower(regexp_replace(review, '\s+', ' ', 'g')), v_norm),
+             word_similarity(v_norm, lower(regexp_replace(review, '\s+', ' ', 'g')))
+           ))
+      into v_best, v_span
+    from public.review_history
+    where task_id = p_task_id
+      and length(review) >= 12;
+
+    if coalesce(v_best, 0) >= 0.52 or coalesce(v_span, 0) >= 0.70 then
+      raise exception 'Similar review already exists (score %): regeneration required',
+        round(greatest(coalesce(v_best, 0), coalesce(v_span, 0))::numeric, 2);
+    end if;
   end if;
 
   insert into public.review_history (task_id, review)

@@ -11,10 +11,22 @@ export const dynamic = "force-dynamic";
 const HISTORY_LIMIT = 500;
 const PROMPT_EXAMPLES = 25;
 const RECENT_EXAMPLES = 15;
-const MAX_GENERATION_ATTEMPTS = 3;
-const MAX_SAVE_ATTEMPTS = 2;
+const MAX_ROUNDS = 8;
 const DUPLICATE_THRESHOLD = 0.7;
 const EXACT_WINDOW = 40;
+
+const VARIATION_HINTS = [
+  "Pick a reference or core idea that none of the recent reviews listed above appear to be based on.",
+  "If your first instinct matches a recent review, switch to a completely different reference or idea.",
+  "Choose the least-used looking idea from the admin's pool rather than the most obvious one.",
+  "Anchor the review in a specific moment (time of day, place, or situation).",
+  "Compare briefly with a similar app you used before, without naming it.",
+  "Include one small imperfection so the review reads honestly.",
+  "Mention recommending it to a friend or family member, and why.",
+  "Highlight something that surprised you more than you expected.",
+  "Describe value for money in your own natural words.",
+  "Keep it short and punchy with a strong first line.",
+];
 
 const normalize = (value: string) =>
   value
@@ -102,23 +114,32 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient();
 
-    const { data: historyRows, error: historyError } = await admin
-      .from("review_history")
-      .select("review")
-      .eq("task_id", task.id)
-      .order("created_at", { ascending: false })
-      .limit(HISTORY_LIMIT);
+    const loadHistory = async () => {
+      const { data, error: historyError } = await admin
+        .from("review_history")
+        .select("review")
+        .eq("task_id", task.id)
+        .order("created_at", { ascending: false })
+        .limit(HISTORY_LIMIT);
 
-    if (historyError) {
-      console.error("review_history load failed:", historyError.message);
-      throw new ApiError("Could not verify review uniqueness, please try again", 502);
-    }
+      if (historyError) {
+        console.error("review_history load failed:", historyError.message);
+        throw new ApiError(
+          "Could not verify review uniqueness, please try again",
+          502
+        );
+      }
 
-    const rawHistory = (historyRows ?? [])
-      .map((row) => (row.review ?? "").trim())
-      .filter((entry) => entry.length > 0);
-    const history = rawHistory.map(normalize).filter((entry) => entry.length > 0);
-    const recent = pickExamples(rawHistory);
+      const raw = (data ?? [])
+        .map((row) => (row.review ?? "").trim())
+        .filter((entry) => entry.length > 0);
+      return {
+        norms: raw.map(normalize).filter((entry) => entry.length > 0),
+        recent: pickExamples(raw),
+      };
+    };
+
+    let { norms: history, recent } = await loadHistory();
 
     const isExactDuplicate = (norm: string) => {
       if (!norm) return true;
@@ -142,84 +163,60 @@ export async function POST(request: NextRequest) {
       return worst;
     };
 
-    let review = "";
-    let retryFeedback: string | undefined;
-    const candidates: Array<{ text: string; score: number }> = [];
+    let feedback: string | undefined;
 
-    for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
+    for (let round = 1; round <= MAX_ROUNDS; round++) {
+      const hint = VARIATION_HINTS[Math.floor(Math.random() * VARIATION_HINTS.length)];
       const text = await generateReviewText(
         task.ai_prompt,
         task.app_name,
         recent,
-        retryFeedback
+        feedback,
+        hint
       );
       const norm = normalize(text);
 
       if (isExactDuplicate(norm)) {
-        retryFeedback =
+        feedback =
           "Your previous output was identical or nearly identical to a review that already exists for this app. Keep following the admin instructions exactly as written, but write a completely different review with a different opening sentence, structure, vocabulary and phrasing.";
         continue;
       }
 
       const score = similarityToHistory(norm);
-      if (score < DUPLICATE_THRESHOLD) {
-        review = text;
-        break;
-      }
-
-      candidates.push({ text, score });
-      if (attempt === MAX_GENERATION_ATTEMPTS && candidates.length > 0) {
-        // Never leave the user without a review: hand back the least similar
-        // candidate instead of failing (the DB guard still blocks verbatim repeats).
-        candidates.sort((left, right) => left.score - right.score);
-        review = candidates[0].text;
-        break;
-      }
-      retryFeedback =
-        "Your previous output repeated or closely imitated a review that already exists for this app. Keep following the admin instructions exactly as written, but rewrite with a completely different opening sentence, structure, vocabulary and phrasing so it cannot be matched to any earlier review.";
-    }
-
-    if (!review) {
-      throw new ApiError(
-        "AI keeps returning a review that already exists, please try again",
-        502
-      );
-    }
-
-    let saveAttempts = 0;
-    for (;;) {
-      const { error: saveError } = await admin.rpc("save_review_history", {
-        p_task_id: task.id,
-        p_review: review,
-      });
-      if (!saveError) break;
-
-      if (/duplicate/i.test(saveError.message) && saveAttempts < MAX_SAVE_ATTEMPTS) {
-        saveAttempts += 1;
-        const fresh = await generateReviewText(
-          task.ai_prompt,
-          task.app_name,
-          recent,
-          "That exact review already exists for this app. Output a completely different review with different wording, opening and structure."
-        );
-        const norm = normalize(fresh);
-        if (norm && !isExactDuplicate(norm)) review = fresh;
+      if (score >= DUPLICATE_THRESHOLD && round < MAX_ROUNDS) {
+        feedback = `Your previous output was too similar to an existing review for this app (similarity ${score.toFixed(2)}). Keep following the admin instructions exactly as written, but rewrite with a completely different opening sentence, structure, vocabulary and phrasing.`;
         continue;
       }
 
-      console.error("review_history save failed:", saveError.message);
-      if (/duplicate/i.test(saveError.message)) {
-        throw new ApiError(
-          "AI returned a review too similar to an existing one, please try again",
-          502
-        );
+      const { error: claimError } = await admin.rpc("save_review_history", {
+        p_task_id: task.id,
+        p_review: text,
+      });
+      if (!claimError) return Response.json({ review: text });
+
+      console.error("review claim failed:", claimError.message);
+      const rejected = /duplicate|similar/i.test(claimError.message);
+      if (rejected && round < MAX_ROUNDS) {
+        // Another user may have claimed a matching review moments ago —
+        // reload so the next attempt avoids the fresh wording too.
+        const fresh = await loadHistory();
+        history = fresh.norms;
+        recent = fresh.recent;
+        feedback =
+          "Another user just claimed a very similar (or identical) review for this app, so yours was rejected as too close to an existing one. Write a clearly different review: new opening sentence, structure, vocabulary and details.";
+        continue;
       }
+      if (rejected) break;
+
       throw new ApiError(
         "Could not record the generated review, please try again",
         502
       );
     }
 
-    return Response.json({ review });
+    throw new ApiError(
+      "AI keeps returning a review that already exists, please try again",
+      502
+    );
   });
 }

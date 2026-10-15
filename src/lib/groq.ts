@@ -17,7 +17,8 @@ export async function generateReviewText(
   adminPrompt: string,
   appName: string,
   recentReviews: string[] = [],
-  retryFeedback?: string
+  retryFeedback?: string,
+  variationHint?: string
 ): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -52,6 +53,8 @@ export async function generateReviewText(
               "- Sound like a real human user: natural, specific, casual phrasing.",
               "- Examples inside the instructions are style references only — never copy their wording.",
               "- If recent reviews are listed, differ from ALL of them: different opening, structure, and vocabulary.",
+              "- If the admin instructions provide a pool of reference ideas, choose one that is clearly different from what the recent reviews listed below are based on — repeating a reference is the main cause of duplicate outputs.",
+              "- If a variation hint is given, pick that angle/details for this run — only where it does not conflict with the admin instructions.",
               "- If retry feedback is given, fix exactly that problem and output only the corrected review.",
             ].join("\n"),
           },
@@ -70,6 +73,7 @@ export async function generateReviewText(
                   ]
                 : []),
               ...(retryFeedback ? ["", `Retry feedback: ${retryFeedback}`] : []),
+              ...(variationHint ? ["", `Variation hint: ${variationHint}`] : []),
               "",
               "Write the review now.",
             ].join("\n"),
