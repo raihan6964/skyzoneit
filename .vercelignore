@@ -1,0 +1,10 @@
+.vercel
+.env*
+node_modules
+.next
+**/__pycache__
+.pytest_cache
+.venv
+python-service/.venv
+python-service/.pytest_cache
+*.tsbuildinfo
