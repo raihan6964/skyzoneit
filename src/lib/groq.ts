@@ -36,7 +36,7 @@ export async function generateReviewText(
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await client.chat.completions.create({
-        model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
+        model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
         temperature: 0.9,
         max_tokens: 4096,
         reasoning_effort: "low",
@@ -142,7 +142,7 @@ export async function gradeAccessTest(
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const response = await client.chat.completions.create({
-        model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
+        model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
         temperature: 0,
         max_tokens: 2000,
         reasoning_effort: "low",

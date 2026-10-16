@@ -36,6 +36,43 @@ import type { UserTask } from "@/lib/types";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
+// Screenshots can be several MB; base64 over the wire is 33% larger and
+// requests over ~4.5MB fail outright. Downscale + JPEG so submissions stay
+// small and reliable on mobile connections.
+async function imageToBase64(file: File): Promise<string> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxEdge = 1600;
+    const scale = Math.min(
+      1,
+      maxEdge / Math.max(bitmap.width, bitmap.height)
+    );
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close?.();
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      const encoded = dataUrl.split(",")[1] ?? "";
+      if (encoded) return encoded;
+    } else {
+      bitmap.close?.();
+    }
+  } catch {
+    // fall through to raw encoding
+  }
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => reject(new Error("Could not read the image"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function PlatformBadge({ platform }: { platform: string }) {
   return (
     <Badge variant="outline" className="gap-1 text-xs font-medium">
@@ -310,12 +347,7 @@ function SubmitDialog({
     }
     setSubmitting(true);
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-        reader.onerror = () => reject(new Error("Could not read the image"));
-        reader.readAsDataURL(file);
-      });
+      const base64 = await imageToBase64(file);
 
       await postJson("/api/user/submissions", {
         task_id: task.id,

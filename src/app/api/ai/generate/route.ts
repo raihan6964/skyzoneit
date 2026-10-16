@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
       );
 
       let rejectionMessage = "";
+      let nearestReview = "";
 
       for (const result of settled) {
         if (result.status === "rejected") {
@@ -128,6 +129,18 @@ export async function POST(request: NextRequest) {
         if (/duplicate|similar/i.test(claimError.message)) {
           hadClaimRejection = true;
           rejectionMessage = claimError.message;
+          if (!nearestReview) {
+            try {
+              const { data: near } = await admin.rpc("find_nearest_review", {
+                p_task_id: task.id,
+                p_review: text,
+              });
+              const nearReview = (near as { review?: string } | null)?.review;
+              if (nearReview) nearestReview = nearReview;
+            } catch {
+              // nearest lookup is best-effort; generic feedback still applies
+            }
+          }
           continue;
         }
         throw new ApiError(
@@ -139,9 +152,11 @@ export async function POST(request: NextRequest) {
       if (rejectionMessage) {
         // Fresh examples so the next wave also avoids what was just claimed.
         recent = await loadRecent();
-        feedback = /duplicate/i.test(rejectionMessage)
-          ? "Your output was identical to a review that already exists for this app. Pick a different reference or core idea from the admin's pool (one the recent reviews do not appear to be based on) and write it naturally from scratch — do not word-swap an existing phrasing."
-          : "Your output was too similar to an existing review for this app. Do not swap individual words or change the subject to escape the match — choose a different reference or core idea from the admin's pool and write it naturally, following the admin instructions exactly.";
+        feedback = nearestReview
+          ? `Your output was too close to an existing review for this app. The closest existing review is: "${nearestReview.slice(0, 200)}". Do NOT reuse its wording, structure, or swap words from it — pick a completely different reference from the admin's pool and write a fresh, natural review following the admin instructions.`
+          : /duplicate/i.test(rejectionMessage)
+            ? "Your output was identical to a review that already exists for this app. Pick a different reference or core idea from the admin's pool (one the recent reviews do not appear to be based on) and write it naturally from scratch — do not word-swap an existing phrasing."
+            : "Your output was too similar to an existing review for this app. Do not swap individual words or change the subject to escape the match — choose a different reference or core idea from the admin's pool and write it naturally, following the admin instructions exactly.";
       }
     }
 

@@ -953,7 +953,7 @@ begin
     where task_id = p_task_id
       and length(review) >= 12;
 
-    if coalesce(v_best, 0) >= 0.52 or coalesce(v_span, 0) >= 0.70 then
+    if coalesce(v_best, 0) >= 0.60 or coalesce(v_span, 0) >= 0.78 then
       raise exception 'Similar review already exists (score %): regeneration required',
         round(greatest(coalesce(v_best, 0), coalesce(v_span, 0))::numeric, 2);
     end if;
@@ -972,6 +972,39 @@ begin
       limit 1000
     );
 end;
+$$;
+
+-- ----------------------------------------------------------------------------
+-- RPC: nearest existing review for a candidate (retry feedback, service only)
+-- ----------------------------------------------------------------------------
+
+create or replace function public.find_nearest_review(
+  p_task_id uuid,
+  p_review  text
+)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object('review', x.nearest, 'score', round(x.score::numeric, 3))
+  from (
+    select r.review as nearest,
+           greatest(
+             similarity(lower(regexp_replace(r.review, '\s+', ' ', 'g')),
+                        lower(regexp_replace(coalesce(p_review, ''), '\s+', ' ', 'g'))),
+             word_similarity(lower(regexp_replace(r.review, '\s+', ' ', 'g')),
+                             lower(regexp_replace(coalesce(p_review, ''), '\s+', ' ', 'g'))),
+             word_similarity(lower(regexp_replace(coalesce(p_review, ''), '\s+', ' ', 'g')),
+                             lower(regexp_replace(r.review, '\s+', ' ', 'g')))
+           ) as score
+    from public.review_history r
+    where r.task_id = p_task_id
+      and length(r.review) >= 12
+    order by 2 desc
+    limit 1
+  ) x;
 $$;
 
 -- ----------------------------------------------------------------------------
@@ -1054,6 +1087,12 @@ revoke execute on function public.save_review_history(uuid, text)
 from public, anon, authenticated;
 
 grant execute on function public.save_review_history(uuid, text)
+to service_role;
+
+revoke execute on function public.find_nearest_review(uuid, text)
+from public, anon, authenticated;
+
+grant execute on function public.find_nearest_review(uuid, text)
 to service_role;
 
 -- ----------------------------------------------------------------------------
