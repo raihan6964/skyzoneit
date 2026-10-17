@@ -11,10 +11,11 @@ export const dynamic = "force-dynamic";
 const HISTORY_LIMIT = 200;
 const PROMPT_EXAMPLES = 12;
 const RECENT_EXAMPLES = 8;
-// Round 1 runs a single candidate (common case = one AI call). Every later
-// round generates two candidates in parallel, so recovery costs one extra
-// wall-clock wave instead of one call per attempt. Kept at 3 so a busy
-// Groq TPM window never turns into a long stall for the user.
+// Round 1 runs a single candidate (common case = one AI call). Later rounds
+// generate two candidates in parallel. No DB similarity gate exists anymore:
+// uniqueness comes from the prompt (recent reviews the model must avoid) plus
+// an in-memory guard that only retries when the output is word-for-word
+// identical to something already handed out.
 const MAX_ROUNDS = 3;
 
 const VARIATION_HINTS = [
@@ -24,6 +25,10 @@ const VARIATION_HINTS = [
   "Write it exactly as a casual real user would — natural words, nothing forced or word-swapped.",
   "Vary the rhythm and opening (short punchy start vs a fuller sentence), keeping the wording natural.",
 ];
+
+function normalize(text: string): string {
+  return text.replace(/\s+/g, " ").trim().toLowerCase();
+}
 
 function pickExamples(reviews: string[]): string[] {
   if (reviews.length <= PROMPT_EXAMPLES) return reviews;
@@ -62,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient();
 
-    const loadRecent = async () => {
+    const loadHistory = async (): Promise<string[]> => {
       const { data, error: historyError } = await admin
         .from("review_history")
         .select("review")
@@ -71,23 +76,22 @@ export async function POST(request: NextRequest) {
         .limit(HISTORY_LIMIT);
 
       if (historyError) {
+        // History only feeds the uniqueness prompt — never block generation.
         console.error("review_history load failed:", historyError.message);
-        throw new ApiError(
-          "Could not verify review uniqueness, please try again",
-          502
-        );
+        return [];
       }
 
-      const raw = (data ?? [])
+      return (data ?? [])
         .map((row) => (row.review ?? "").trim())
         .filter((entry) => entry.length > 0);
-      return pickExamples(raw);
     };
 
-    let recent = await loadRecent();
+    const history = await loadHistory();
+    const claimed = new Set(history.map(normalize));
+    const recent = pickExamples(history);
     let feedback: string | undefined;
     let lastAiError: unknown;
-    let hadClaimRejection = false;
+    let hadIdentical = false;
 
     const pickHint = () =>
       VARIATION_HINTS[Math.floor(Math.random() * VARIATION_HINTS.length)];
@@ -109,62 +113,44 @@ export async function POST(request: NextRequest) {
         )
       );
 
-      let rejectionMessage = "";
-      let nearestReview = "";
-
       for (const result of settled) {
         if (result.status === "rejected") {
           lastAiError = result.reason;
           continue;
         }
-        const text = result.value;
-        if (!text.trim()) continue;
+        const text = result.value.trim();
+        if (!text) continue;
 
-        const { error: claimError } = await admin.rpc("save_review_history", {
+        // Never hand out the exact same review twice; anything else is fine.
+        const key = normalize(text);
+        if (claimed.has(key)) {
+          hadIdentical = true;
+          feedback =
+            "Your output was word-for-word identical to a review already generated for this app. Write a fresh review based on a different reference or core idea from the admin's pool — do not repeat any wording.";
+          continue;
+        }
+
+        const { error: saveError } = await admin.rpc("save_review_history", {
           p_task_id: task.id,
           p_review: text,
         });
-        if (!claimError) return Response.json({ review: text });
-
-        console.error("review claim failed:", claimError.message);
-        if (/duplicate|similar/i.test(claimError.message)) {
-          hadClaimRejection = true;
-          rejectionMessage = claimError.message;
-          if (!nearestReview) {
-            try {
-              const { data: near } = await admin.rpc("find_nearest_review", {
-                p_task_id: task.id,
-                p_review: text,
-              });
-              const nearReview = (near as { review?: string } | null)?.review;
-              if (nearReview) nearestReview = nearReview;
-            } catch {
-              // nearest lookup is best-effort; generic feedback still applies
-            }
-          }
-          continue;
+        if (saveError) {
+          console.error("review save failed:", saveError.message);
+          throw new ApiError(
+            "Could not record the generated review, please try again",
+            502
+          );
         }
-        throw new ApiError(
-          "Could not record the generated review, please try again",
-          502
-        );
-      }
 
-      if (rejectionMessage) {
-        // Fresh examples so the next wave also avoids what was just claimed.
-        recent = await loadRecent();
-        feedback = nearestReview
-          ? `Your output was too close to an existing review for this app. The closest existing review is: "${nearestReview.slice(0, 200)}". Do NOT reuse its wording, structure, or swap words from it — pick a completely different reference from the admin's pool and write a fresh, natural review following the admin instructions.`
-          : /duplicate/i.test(rejectionMessage)
-            ? "Your output was identical to a review that already exists for this app. Pick a different reference or core idea from the admin's pool (one the recent reviews do not appear to be based on) and write it naturally from scratch — do not word-swap an existing phrasing."
-            : "Your output was too similar to an existing review for this app. Do not swap individual words or change the subject to escape the match — choose a different reference or core idea from the admin's pool and write it naturally, following the admin instructions exactly.";
+        claimed.add(key);
+        return Response.json({ review: text });
       }
     }
 
-    if (!hadClaimRejection && lastAiError) throw lastAiError;
+    if (!hadIdentical && lastAiError) throw lastAiError;
 
     throw new ApiError(
-      "AI keeps returning a review that already exists, please try again",
+      "AI keeps returning an already-used review, please try again",
       502
     );
   });
