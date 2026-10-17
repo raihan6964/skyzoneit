@@ -1,6 +1,25 @@
 import OpenAI from "openai";
 import { ApiError } from "@/lib/error";
 
+// Groq free-tier TPM is tight (~8k); the OpenAI SDK's default retries honor
+// Retry-After headers that can be minutes long, which stalls "Generating..."
+// for users. We fail fast and do at most one short bounded wait ourselves.
+const GROQ_MAX_RETRIES = 0;
+const GROQ_TIMEOUT_MS = 20_000;
+const RATE_LIMIT_WAIT_MS = 2_000;
+
+function isRateLimit(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { status?: number }).status === 429
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function sanitizeReview(raw: string): string {
   let text = raw.trim();
   text = text.replace(/^```[a-zA-Z]*\s*/, "").replace(/\s*```$/, "").trim();
@@ -30,6 +49,8 @@ export async function generateReviewText(
   const client = new OpenAI({
     apiKey,
     baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
+    maxRetries: GROQ_MAX_RETRIES,
+    timeout: GROQ_TIMEOUT_MS,
   });
 
   let failure: "empty" | "long" = "empty";
@@ -38,7 +59,7 @@ export async function generateReviewText(
       const response = await client.chat.completions.create({
         model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
         temperature: 0.9,
-        max_tokens: 4096,
+        max_tokens: 400,
         reasoning_effort: "low",
         messages: [
           {
@@ -73,7 +94,7 @@ export async function generateReviewText(
                 ? [
                     "",
                     "Recent reviews already generated for this app (must NOT repeat or closely imitate any of them):",
-                    ...recentReviews.map((r, i) => `${i + 1}. ${r.slice(0, 200)}`),
+                    ...recentReviews.map((r, i) => `${i + 1}. ${r.slice(0, 140)}`),
                   ]
                 : []),
               ...(retryFeedback ? ["", `Retry feedback: ${retryFeedback}`] : []),
@@ -90,6 +111,18 @@ export async function generateReviewText(
       if (text && text.length <= 1200) return text;
       failure = text ? "long" : "empty";
     } catch (error) {
+      // One short bounded wait on rate limit, then give up fast instead of
+      // stalling the request on long Retry-After windows.
+      if (isRateLimit(error) && attempt === 1) {
+        await sleep(RATE_LIMIT_WAIT_MS);
+        continue;
+      }
+      if (isRateLimit(error)) {
+        throw new ApiError(
+          "AI is busy right now, please try again in a few seconds",
+          503
+        );
+      }
       if (attempt === 2) {
         const message =
           error instanceof Error ? error.message : "AI request failed";
@@ -120,6 +153,8 @@ export async function gradeAccessTest(
   const client = new OpenAI({
     apiKey,
     baseURL: process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1",
+    maxRetries: GROQ_MAX_RETRIES,
+    timeout: GROQ_TIMEOUT_MS,
   });
 
   const system = [

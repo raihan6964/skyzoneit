@@ -8,13 +8,14 @@ import { generateReviewSchema } from "@/lib/validations";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-const HISTORY_LIMIT = 500;
-const PROMPT_EXAMPLES = 25;
-const RECENT_EXAMPLES = 15;
+const HISTORY_LIMIT = 200;
+const PROMPT_EXAMPLES = 12;
+const RECENT_EXAMPLES = 8;
 // Round 1 runs a single candidate (common case = one AI call). Every later
 // round generates two candidates in parallel, so recovery costs one extra
-// wall-clock wave instead of one call per attempt.
-const MAX_ROUNDS = 4;
+// wall-clock wave instead of one call per attempt. Kept at 3 so a busy
+// Groq TPM window never turns into a long stall for the user.
+const MAX_ROUNDS = 3;
 
 const VARIATION_HINTS = [
   "Pick a reference or core idea that none of the recent reviews listed above appear to be based on.",
