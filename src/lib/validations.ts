@@ -84,6 +84,18 @@ export function dailyEndAfterStart(data: {
   return !data.start_time || !data.end_time || data.end_time > data.start_time;
 }
 
+// Parse an admin-entered numbered review list ("1. good app", "2) best app",
+// "3 - nice") into clean review lines with the numbering stripped. Blank
+// lines are dropped. A number only counts as numbering when followed by a
+// delimiter (., ), -, —, :), so a review like "5 stars, loved it" is kept.
+export function parseTextReviews(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*\d+\s*[.)\-–—:]\s*/, "").trim())
+    .filter((line) => line.length > 0);
+}
+
 const taskFormObject = z.object({
   app_name: z.string().trim().min(1, "App name is required").max(80),
   app_link: z.url("Enter a valid store URL"),
@@ -94,7 +106,9 @@ const taskFormObject = z.object({
   reward: nonNegativeNumber,
   daily_limit: optionalPositiveInt,
   per_user_limit: optionalPositiveInt,
-  ai_prompt: z.string().trim().min(1, "AI prompt is required"),
+  generation_mode: z.enum(["prompt", "text"]).optional().default("prompt"),
+  ai_prompt: z.string().trim().max(20000).optional().default(""),
+  text_reviews: z.string().trim().max(50000).optional().default(""),
   cron_time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a time (e.g. 21:00)"),
   fail_action: z.enum(["pending", "rejected"]),
   start_at: optionalDateTime,
@@ -112,6 +126,23 @@ export const taskFormSchema = taskFormObject
   .refine(dailyEndAfterStart, {
     message: "Close time must be after open time",
     path: ["end_time"],
+  })
+  .superRefine((data, ctx) => {
+    if (data.generation_mode === "text") {
+      if (parseTextReviews(data.text_reviews).length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Add at least one review line",
+          path: ["text_reviews"],
+        });
+      }
+    } else if (!data.ai_prompt) {
+      ctx.addIssue({
+        code: "custom",
+        message: "AI prompt is required",
+        path: ["ai_prompt"],
+      });
+    }
   });
 
 export const taskFormPatchSchema = taskFormObject.partial();

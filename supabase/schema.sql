@@ -36,6 +36,9 @@ create table public.tasks (
   daily_limit       integer check (daily_limit is null or daily_limit > 0),
   per_user_limit    integer check (per_user_limit is null or per_user_limit > 0),
   ai_prompt         text not null default '',
+  generation_mode   text not null default 'prompt'
+                      check (generation_mode in ('prompt', 'text')),
+  text_reviews      text,
   cron_time         time not null default '21:00',
   fail_action       text not null default 'rejected' check (fail_action in ('pending', 'rejected')),
   start_at          timestamptz,
@@ -137,6 +140,17 @@ create table public.review_history (
 );
 
 -- ----------------------------------------------------------------------------
+-- Task text reviews (fixed admin review lists; used_at marks a handed-out copy)
+-- ----------------------------------------------------------------------------
+
+create table public.task_text_reviews (
+  task_id  uuid not null references public.tasks (id) on delete cascade,
+  review   text not null,
+  used_at  timestamptz,
+  primary key (task_id, review)
+);
+
+-- ----------------------------------------------------------------------------
 -- Indexes
 -- ----------------------------------------------------------------------------
 
@@ -154,6 +168,9 @@ create index withdrawals_status_idx on public.withdrawals (status, created_at de
 create index withdrawals_user_idx on public.withdrawals (user_id, created_at desc);
 create index balance_tx_user_idx on public.balance_transactions (user_id, created_at desc);
 create index review_history_task_idx on public.review_history (task_id, created_at desc);
+create index task_text_reviews_available_idx
+  on public.task_text_reviews (task_id)
+  where used_at is null;
 
 -- ----------------------------------------------------------------------------
 -- Helpers
@@ -307,6 +324,8 @@ alter table public.balance_transactions enable row level security;
 alter table public.app_settings enable row level security;
 alter table public.review_history enable row level security;
 -- review_history has no policies: only service_role may access it
+alter table public.task_text_reviews enable row level security;
+-- task_text_reviews has no policies: only service_role may access it
 
 create policy profiles_select on public.profiles
   for select to authenticated

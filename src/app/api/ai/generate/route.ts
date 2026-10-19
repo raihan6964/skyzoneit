@@ -3,7 +3,7 @@ import { withApi, requireUser } from "@/lib/api";
 import { ApiError } from "@/lib/error";
 import { generateReviewText } from "@/lib/groq";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateReviewSchema } from "@/lib/validations";
+import { parseTextReviews, generateReviewSchema } from "@/lib/validations";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -55,17 +55,52 @@ export async function POST(request: NextRequest) {
 
     const { data: task, error } = await supabase
       .from("tasks")
-      .select("id, app_name, ai_prompt, status, start_at, end_at")
+      .select(
+        "id, app_name, ai_prompt, generation_mode, text_reviews, status, start_at, end_at"
+      )
       .eq("id", parsed.data.task_id)
       .single();
 
     if (error || !task) throw new ApiError("Task not found", 404);
     if (task.status !== "active") throw new ApiError("Task is inactive", 400);
+
+    const admin = createAdminClient();
+
+    // Text mode: hand out one unused review from the admin's fixed list.
+    // A review is marked used only when the worker copies it (POST /api/ai/claim),
+    // so generating does not consume it — regenerate can re-show it.
+    if (task.generation_mode === "text") {
+      const pool = parseTextReviews(task.text_reviews);
+      if (pool.length === 0) {
+        throw new ApiError("No reviews available for this app yet", 400);
+      }
+
+      const { data: usedRows, error: usedError } = await admin
+        .from("task_text_reviews")
+        .select("review")
+        .eq("task_id", task.id)
+        .not("used_at", "is", null);
+
+      if (usedError) {
+        throw new ApiError("Could not check review availability", 502);
+      }
+
+      const used = new Set((usedRows ?? []).map((row) => row.review));
+      const available = pool.filter((entry) => !used.has(entry));
+      if (available.length === 0) {
+        throw new ApiError(
+          "All reviews for this app have been used already",
+          400
+        );
+      }
+
+      const review = available[Math.floor(Math.random() * available.length)];
+      return Response.json({ review });
+    }
+
     if (!task.ai_prompt?.trim()) {
       throw new ApiError("No AI prompt configured for this app yet", 400);
     }
-
-    const admin = createAdminClient();
 
     const loadHistory = async (): Promise<string[]> => {
       const { data, error: historyError } = await admin

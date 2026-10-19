@@ -3,8 +3,9 @@ import { withApi, requireAdmin, unwrap } from "@/lib/api";
 import { ApiError } from "@/lib/error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractPackageInfo } from "@/lib/packages";
-import { taskFormSchema } from "@/lib/validations";
+import { parseTextReviews, taskFormSchema } from "@/lib/validations";
 import { fromDatetimeLocal } from "@/lib/format";
+import { syncTextReviewPool } from "@/lib/text-reviews";
 import type { Task } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,9 @@ function normalizeTaskInput(body: unknown) {
     reward: value.reward,
     daily_limit: value.daily_limit,
     per_user_limit: value.per_user_limit,
+    generation_mode: value.generation_mode,
     ai_prompt: value.ai_prompt,
+    text_reviews: value.text_reviews || null,
     cron_time: value.cron_time,
     fail_action: value.fail_action,
     start_at: fromDatetimeLocal(value.start_at ?? ""),
@@ -59,7 +62,14 @@ export async function POST(request: NextRequest) {
     const payload = normalizeTaskInput(body);
     const task = unwrap(
       await admin.from("tasks").insert(payload).select("*").single()
-    );
-    return Response.json({ task: task as Task }, { status: 201 });
+    ) as Task;
+    if (task.generation_mode === "text") {
+      await syncTextReviewPool(
+        admin,
+        task.id,
+        parseTextReviews(task.text_reviews)
+      );
+    }
+    return Response.json({ task }, { status: 201 });
   });
 }

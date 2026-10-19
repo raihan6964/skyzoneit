@@ -5,6 +5,7 @@ export type SubmissionStatus = "pending" | "approved" | "rejected";
 export type WithdrawalStatus = "pending" | "paid" | "cancelled";
 export type FailAction = "pending" | "rejected";
 export type Platform = "android" | "ios";
+export type GenerationMode = "prompt" | "text";
 
 export interface Profile {
   id: string;
@@ -31,6 +32,8 @@ export interface Task {
   daily_limit: number | null;
   per_user_limit: number | null;
   ai_prompt: string;
+  generation_mode: GenerationMode;
+  text_reviews: string | null;
   cron_time: string;
   fail_action: FailAction;
   start_at: string | null;

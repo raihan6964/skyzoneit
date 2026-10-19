@@ -52,7 +52,9 @@ const DEFAULT_VALUES: TaskFormValues = {
   reward: 0,
   daily_limit: "",
   per_user_limit: "",
+  generation_mode: "prompt",
   ai_prompt: "",
+  text_reviews: "",
   cron_time: "21:00",
   fail_action: "pending",
   start_at: "",
@@ -109,7 +111,9 @@ export function TaskDialog({
             reward: current.reward,
             daily_limit: current.daily_limit ?? "",
             per_user_limit: current.per_user_limit ?? "",
+            generation_mode: current.generation_mode ?? "prompt",
             ai_prompt: current.ai_prompt,
+            text_reviews: current.text_reviews ?? "",
             cron_time: current.cron_time,
             fail_action: current.fail_action,
             start_at: toDatetimeLocal(current.start_at),
@@ -129,6 +133,7 @@ export function TaskDialog({
 
   const bannerUrl = useWatch({ control, name: "banner_url" });
   const platform = useWatch({ control, name: "platform" });
+  const generationMode = useWatch({ control, name: "generation_mode" });
   const failAction = useWatch({ control, name: "fail_action" });
   const status = useWatch({ control, name: "status" });
 
@@ -406,25 +411,75 @@ export function TaskDialog({
             </div>
 
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="task-ai-prompt">
-                <Sparkles className="size-3.5 text-primary" />
-                AI prompt
-              </Label>
-              <Textarea
-                id="task-ai-prompt"
-                rows={5}
-                placeholder="Describe the app so the AI Review Generator can write natural reviews..."
-                {...register("ai_prompt")}
-              />
-              <p className="text-xs text-muted-foreground">
-                Used by the AI Review Generator on the user panel.
-              </p>
-              {errors.ai_prompt && (
-                <p className="text-xs text-destructive">
-                  {errors.ai_prompt.message}
-                </p>
-              )}
+              <Label>Review source</Label>
+              <Select
+                value={generationMode}
+                onValueChange={(value) => {
+                  if (value === "prompt" || value === "text") {
+                    setValue("generation_mode", value, { shouldDirty: true });
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  {generationMode === "text"
+                    ? "Text list (give each review once)"
+                    : "AI prompt (unique review every time)"}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prompt">
+                    AI prompt (unique review every time)
+                  </SelectItem>
+                  <SelectItem value="text">
+                    Text list (give each review once)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {generationMode === "text" ? (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="task-text-reviews">Review list</Label>
+                <Textarea
+                  id="task-text-reviews"
+                  rows={6}
+                  placeholder={
+                    "1. Great app, works perfectly\n2. Best app I've used this year\n3. Highly recommend this app"
+                  }
+                  {...register("text_reviews")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  One review per line (numbering is stripped before workers see
+                  it). Each review is given to only one worker — marked used
+                  when they copy it.
+                </p>
+                {errors.text_reviews && (
+                  <p className="text-xs text-destructive">
+                    {errors.text_reviews.message}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="task-ai-prompt">
+                  <Sparkles className="size-3.5 text-primary" />
+                  AI prompt
+                </Label>
+                <Textarea
+                  id="task-ai-prompt"
+                  rows={5}
+                  placeholder="Describe the app so the AI Review Generator can write natural reviews..."
+                  {...register("ai_prompt")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used by the AI Review Generator on the user panel.
+                </p>
+                {errors.ai_prompt && (
+                  <p className="text-xs text-destructive">
+                    {errors.ai_prompt.message}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="task-cron">Approval start time</Label>

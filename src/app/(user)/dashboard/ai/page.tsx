@@ -26,6 +26,7 @@ import type { UserTask } from "@/lib/types";
 export default function ReviewGeneratorPage() {
   const [taskId, setTaskId] = useState("");
   const [review, setReview] = useState("");
+  const [reviewTaskId, setReviewTaskId] = useState("");
   const [generating, setGenerating] = useState(false);
 
   const { data } = useApi<{ tasks: UserTask[] }>("/api/user/tasks");
@@ -45,6 +46,7 @@ export default function ReviewGeneratorPage() {
         { task_id: taskId }
       );
       setReview(result.review);
+      setReviewTaskId(taskId);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Generation failed");
     } finally {
@@ -54,9 +56,20 @@ export default function ReviewGeneratorPage() {
 
   const copyAndClear = async () => {
     if (!review) return;
+    const copied = review;
+    const fromTask = reviewTaskId;
     try {
-      await navigator.clipboard.writeText(review);
+      await navigator.clipboard.writeText(copied);
+      // Text-mode tasks: mark the review used so it is never handed out again.
+      // Best-effort — clipboard copy already succeeded either way.
+      if (fromTask) {
+        void postJson("/api/ai/claim", {
+          task_id: fromTask,
+          review: copied,
+        }).catch(() => {});
+      }
       setReview("");
+      setReviewTaskId("");
       toast.success("Copied to clipboard — review cleared");
     } catch {
       toast.error("Could not access the clipboard");
