@@ -36,10 +36,13 @@ import type { UserTask } from "@/lib/types";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-// Screenshots can be several MB; base64 over the wire is 33% larger and
-// requests over ~4.5MB fail outright. Downscale + JPEG so submissions stay
-// small and reliable on mobile connections.
-async function imageToBase64(file: File): Promise<string> {
+// Compress to JPEG (max 1600px) + return base64 without the data: prefix.
+// Canvas path first; fall back to raw base64 if the browser cannot decode
+// the file (e.g. HEIC) via createImageBitmap.
+async function fileToCompressedBase64(file: File): Promise<{
+  base64: string;
+  preview: string;
+}> {
   try {
     const bitmap = await createImageBitmap(file);
     const maxEdge = 1600;
@@ -58,16 +61,24 @@ async function imageToBase64(file: File): Promise<string> {
       bitmap.close?.();
       const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
       const encoded = dataUrl.split(",")[1] ?? "";
-      if (encoded) return encoded;
+      if (encoded) return { base64: encoded, preview: dataUrl };
     } else {
       bitmap.close?.();
     }
   } catch {
     // fall through to raw encoding
   }
-  return await new Promise<string>((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      const encoded = dataUrl.split(",")[1] ?? "";
+      if (!encoded) {
+        reject(new Error("Could not read the image"));
+        return;
+      }
+      resolve({ base64: encoded, preview: dataUrl });
+    };
     reader.onerror = () => reject(new Error("Could not read the image"));
     reader.readAsDataURL(file);
   });
@@ -307,7 +318,8 @@ function SubmitDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [base64, setBase64] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -318,7 +330,12 @@ function SubmitDialog({
     formState: { errors },
   } = useForm<SubmissionInput>({ resolver: zodResolver(submissionSchema) });
 
-  const pickFile = (selected: File | null | undefined) => {
+  // Compress + encode ONCE at pick time. Android content:// files (Google
+  // Photos / gallery) often cannot be re-read on submit — the stream is
+  // already consumed — which caused "Could not read the image" errors.
+  const pickFile = async (
+    selected: File | null | undefined
+  ) => {
     if (!selected) return;
     if (!selected.type.startsWith("image/")) {
       toast.error("Please choose an image file");
@@ -328,27 +345,35 @@ function SubmitDialog({
       toast.error("Screenshot must be smaller than 5MB");
       return;
     }
-    setFile(selected);
-    const reader = new FileReader();
-    reader.onload = () => setPreview(String(reader.result));
-    reader.readAsDataURL(selected);
+    setProcessing(true);
+    try {
+      const { base64: encoded, preview: dataUrl } =
+        await fileToCompressedBase64(selected);
+      setBase64(encoded);
+      setPreview(dataUrl);
+    } catch {
+      toast.error("Could not read the image — please pick another screenshot");
+      setBase64(null);
+      setPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const clearFile = () => {
-    setFile(null);
+    setBase64(null);
     setPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const onSubmit = async (values: SubmissionInput) => {
-    if (!file) {
+    if (!base64) {
       toast.error("Please upload your review screenshot");
       return;
     }
     setSubmitting(true);
     try {
-      const base64 = await imageToBase64(file);
-
       await postJson("/api/user/submissions", {
         task_id: task.id,
         reviewer_name: values.reviewer_name,
@@ -453,10 +478,17 @@ function SubmitDialog({
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
               className="hidden"
-              onChange={(event) => pickFile(event.target.files?.[0])}
+              onChange={(event) => {
+                void pickFile(event.target.files?.[0]);
+              }}
             />
 
-            {preview ? (
+            {processing ? (
+              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-6 text-sm text-muted-foreground">
+                <Loader2 className="size-5 animate-spin text-primary" />
+                <span className="font-medium">Processing screenshot…</span>
+              </div>
+            ) : preview ? (
               <div className="relative overflow-hidden rounded-lg border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -486,13 +518,21 @@ function SubmitDialog({
             )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={submitting}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={submitting || processing || !base64}
+          >
             {submitting ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <ClipboardCheck className="size-4" />
             )}
-            {submitting ? "Uploading & submitting..." : "Submit review"}
+            {submitting
+              ? "Uploading & submitting..."
+              : processing
+                ? "Processing screenshot..."
+                : "Submit review"}
           </Button>
         </form>
       </DialogContent>
