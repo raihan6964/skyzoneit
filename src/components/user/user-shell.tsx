@@ -32,9 +32,11 @@ const NAV_ITEMS: Array<{
 ];
 
 function useProfile() {
+  // Balance must reflect admin approvals within seconds — poll so the
+  // wallet pill updates even while the worker stays on the same page.
   return useApi<{ profile: Profile; min_withdrawal: number }>(
     "/api/user/profile",
-    { revalidateOnFocus: false }
+    { refreshInterval: 10000, revalidateOnFocus: true }
   );
 }
 

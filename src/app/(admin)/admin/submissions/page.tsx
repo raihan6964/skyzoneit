@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { mutate } from "swr";
 import {
   Check,
   ClipboardCheck,
@@ -124,6 +125,9 @@ export default function AdminSubmissionsPage() {
 
   const refreshAll = () => {
     void refresh();
+    // Revalidate every cached admin view (users, balances, stats) so
+    // balances reflect the approval without a manual page reload.
+    void mutate(() => true);
   };
 
   const toggleBulkMode = () => {
