@@ -109,6 +109,19 @@ const taskFormObject = z.object({
   generation_mode: z.enum(["prompt", "text"]).optional().default("prompt"),
   ai_prompt: z.string().trim().max(20000).optional().default(""),
   text_reviews: z.string().trim().max(50000).optional().default(""),
+  fixed_user_mode: z.boolean().optional().default(false),
+  fixed_users: z
+    .array(
+      z.object({
+        user_id: z.uuid("Invalid user"),
+        daily_limit: z.coerce
+          .number({ error: "Enter a daily limit" })
+          .int("Enter a whole number")
+          .positive("Must be at least 1"),
+      })
+    )
+    .optional()
+    .default([]),
   cron_time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a time (e.g. 21:00)"),
   fail_action: z.enum(["pending", "rejected"]),
   start_at: optionalDateTime,
@@ -142,6 +155,15 @@ export const taskFormSchema = taskFormObject
         message: "AI prompt is required",
         path: ["ai_prompt"],
       });
+    }
+    if (data.fixed_user_mode) {
+      if (data.fixed_users.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Add at least one user",
+          path: ["fixed_users"],
+        });
+      }
     }
   });
 

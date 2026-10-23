@@ -39,6 +39,7 @@ create table public.tasks (
   generation_mode   text not null default 'prompt'
                       check (generation_mode in ('prompt', 'text')),
   text_reviews      text,
+  fixed_user_mode   boolean not null default false,
   cron_time         time not null default '21:00',
   fail_action       text not null default 'rejected' check (fail_action in ('pending', 'rejected')),
   start_at          timestamptz,
@@ -151,6 +152,17 @@ create table public.task_text_reviews (
 );
 
 -- ----------------------------------------------------------------------------
+-- Task fixed users (restricted tasks: member list, each with own daily limit)
+-- ----------------------------------------------------------------------------
+
+create table public.task_fixed_users (
+  task_id     uuid not null references public.tasks (id) on delete cascade,
+  user_id     uuid not null references public.profiles (id) on delete cascade,
+  daily_limit integer not null check (daily_limit > 0),
+  primary key (task_id, user_id)
+);
+
+-- ----------------------------------------------------------------------------
 -- Indexes
 -- ----------------------------------------------------------------------------
 
@@ -171,6 +183,7 @@ create index review_history_task_idx on public.review_history (task_id, created_
 create index task_text_reviews_available_idx
   on public.task_text_reviews (task_id)
   where used_at is null;
+create index task_fixed_users_user_idx on public.task_fixed_users (user_id);
 
 -- ----------------------------------------------------------------------------
 -- Helpers
@@ -326,6 +339,8 @@ alter table public.review_history enable row level security;
 -- review_history has no policies: only service_role may access it
 alter table public.task_text_reviews enable row level security;
 -- task_text_reviews has no policies: only service_role may access it
+alter table public.task_fixed_users enable row level security;
+-- task_fixed_users has no policies: only service_role may access it
 
 create policy profiles_select on public.profiles
   for select to authenticated
@@ -382,6 +397,7 @@ declare
   v_task       public.tasks%rowtype;
   v_now        time := (now() at time zone 'Asia/Dhaka')::time;
   v_count      integer;
+  v_fixed      integer;
   v_submission public.submissions%rowtype;
 begin
   if v_uid is null then
@@ -420,27 +436,49 @@ begin
       coalesce(to_char(v_task.start_time, 'HH24:MI'), '00:00');
   end if;
 
-  if v_task.daily_limit is not null then
-    select count(*) into v_count
-    from public.submissions
+  if v_task.fixed_user_mode then
+    select daily_limit into v_fixed
+    from public.task_fixed_users
     where task_id = v_task.id
-      and submitted_date = public.dhaka_today();
+      and user_id = v_uid;
 
-    if v_count >= v_task.daily_limit then
-      raise exception 'Daily review limit reached for this app';
+    if v_fixed is null then
+      raise exception 'This app is not available for your account';
     end if;
-  end if;
 
-  if v_task.per_user_limit is not null then
     select count(*) into v_count
     from public.submissions
     where task_id = v_task.id
       and user_id = v_uid
       and submitted_date = public.dhaka_today();
 
-    if v_count >= v_task.per_user_limit then
+    if v_count >= v_fixed then
       raise exception 'You reached the daily limit of % reviews for this task',
-        v_task.per_user_limit;
+        v_fixed;
+    end if;
+  else
+    if v_task.daily_limit is not null then
+      select count(*) into v_count
+      from public.submissions
+      where task_id = v_task.id
+        and submitted_date = public.dhaka_today();
+
+      if v_count >= v_task.daily_limit then
+        raise exception 'Daily review limit reached for this app';
+      end if;
+    end if;
+
+    if v_task.per_user_limit is not null then
+      select count(*) into v_count
+      from public.submissions
+      where task_id = v_task.id
+        and user_id = v_uid
+        and submitted_date = public.dhaka_today();
+
+      if v_count >= v_task.per_user_limit then
+        raise exception 'You reached the daily limit of % reviews for this task',
+          v_task.per_user_limit;
+      end if;
     end if;
   end if;
 

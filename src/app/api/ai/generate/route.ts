@@ -45,7 +45,7 @@ function pickExamples(reviews: string[]): string[] {
 
 export async function POST(request: NextRequest) {
   return withApi(async () => {
-    const { supabase } = await requireUser();
+    const { supabase, profile } = await requireUser();
 
     const body = await request.json();
     const parsed = generateReviewSchema.safeParse(body);
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     const { data: task, error } = await supabase
       .from("tasks")
       .select(
-        "id, app_name, ai_prompt, generation_mode, text_reviews, status, start_at, end_at"
+        "id, app_name, ai_prompt, generation_mode, text_reviews, fixed_user_mode, status, start_at, end_at"
       )
       .eq("id", parsed.data.task_id)
       .single();
@@ -65,6 +65,22 @@ export async function POST(request: NextRequest) {
     if (task.status !== "active") throw new ApiError("Task is inactive", 400);
 
     const admin = createAdminClient();
+
+    // Fixed-user tasks: only the selected members may generate for this app.
+    if (task.fixed_user_mode) {
+      const { data: membership, error: memberError } = await admin
+        .from("task_fixed_users")
+        .select("user_id")
+        .eq("task_id", task.id)
+        .eq("user_id", profile.id)
+        .maybeSingle();
+      if (memberError) {
+        throw new ApiError("Could not verify access", 502);
+      }
+      if (!membership) {
+        throw new ApiError("This app is not available for your account", 403);
+      }
+    }
 
     // Text mode: hand out one unused review from the admin's fixed list.
     // A review is marked used only when the worker copies it (POST /api/ai/claim),

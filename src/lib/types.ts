@@ -34,6 +34,8 @@ export interface Task {
   ai_prompt: string;
   generation_mode: GenerationMode;
   text_reviews: string | null;
+  fixed_user_mode: boolean;
+  fixed_users?: FixedTaskUser[];
   cron_time: string;
   fail_action: FailAction;
   start_at: string | null;
@@ -113,6 +115,12 @@ export interface UserTask extends Task {
   my_today: number;
   locked: boolean;
   lock_reason: "window" | "limit" | "user_limit" | null;
+}
+
+export interface FixedTaskUser {
+  user_id: string;
+  daily_limit: number;
+  profile?: Pick<Profile, "sky_id" | "full_name" | "email"> | null;
 }
 
 export interface SheetRow {

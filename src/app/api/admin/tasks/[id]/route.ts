@@ -11,6 +11,7 @@ import {
 } from "@/lib/validations";
 import { fromDatetimeLocal } from "@/lib/format";
 import { syncTextReviewPool } from "@/lib/text-reviews";
+import { syncTaskFixedUsers } from "@/lib/fixed-users";
 import type { Task } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,13 @@ export async function PATCH(
     ) {
       throw new ApiError("AI prompt is required");
     }
+    if (
+      value.fixed_user_mode &&
+      has("fixed_users") &&
+      value.fixed_users?.length === 0
+    ) {
+      throw new ApiError("Add at least one user");
+    }
 
     const payload: Record<string, unknown> = {};
     if (has("app_name")) payload.app_name = value.app_name;
@@ -84,6 +92,7 @@ export async function PATCH(
     if (has("generation_mode")) payload.generation_mode = value.generation_mode;
     if (has("ai_prompt")) payload.ai_prompt = value.ai_prompt;
     if (has("text_reviews")) payload.text_reviews = value.text_reviews || null;
+    if (has("fixed_user_mode")) payload.fixed_user_mode = value.fixed_user_mode;
     if (has("cron_time")) payload.cron_time = value.cron_time;
     if (has("fail_action")) payload.fail_action = value.fail_action;
     if (has("start_at")) payload.start_at = fromDatetimeLocal(value.start_at ?? "");
@@ -111,6 +120,9 @@ export async function PATCH(
         task.id,
         parseTextReviews(task.text_reviews)
       );
+    }
+    if (has("fixed_users")) {
+      await syncTaskFixedUsers(admin, task.id, value.fixed_users ?? []);
     }
 
     return Response.json({ task });

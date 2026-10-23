@@ -38,6 +38,10 @@ import { postJson } from "@/lib/hooks";
 import { extractPackageInfo, type PackageInfo } from "@/lib/packages";
 import type { Task } from "@/lib/types";
 import { taskFormSchema } from "@/lib/validations";
+import {
+  FixedUsersField,
+  type FixedUserEntry,
+} from "@/components/admin/fixed-users-field";
 
 type TaskFormValues = z.input<typeof taskFormSchema>;
 type TaskFormOutput = z.output<typeof taskFormSchema>;
@@ -55,6 +59,8 @@ const DEFAULT_VALUES: TaskFormValues = {
   generation_mode: "prompt",
   ai_prompt: "",
   text_reviews: "",
+  fixed_user_mode: false,
+  fixed_users: [],
   cron_time: "21:00",
   fail_action: "pending",
   start_at: "",
@@ -114,6 +120,16 @@ export function TaskDialog({
             generation_mode: current.generation_mode ?? "prompt",
             ai_prompt: current.ai_prompt,
             text_reviews: current.text_reviews ?? "",
+            fixed_user_mode: current.fixed_user_mode ?? false,
+            fixed_users: (current.fixed_users ?? []).map(
+              (entry): FixedUserEntry => ({
+                user_id: entry.user_id,
+                daily_limit: entry.daily_limit,
+                label: `${entry.profile?.sky_id ?? ""} · ${
+                  entry.profile?.full_name || entry.profile?.email || ""
+                }`.replace(/^ · | · $/g, ""),
+              })
+            ),
             cron_time: current.cron_time,
             fail_action: current.fail_action,
             start_at: toDatetimeLocal(current.start_at),
@@ -134,6 +150,8 @@ export function TaskDialog({
   const bannerUrl = useWatch({ control, name: "banner_url" });
   const platform = useWatch({ control, name: "platform" });
   const generationMode = useWatch({ control, name: "generation_mode" });
+  const fixedMode = useWatch({ control, name: "fixed_user_mode" });
+  const fixedUsers = useWatch({ control, name: "fixed_users" }) ?? [];
   const failAction = useWatch({ control, name: "fail_action" });
   const status = useWatch({ control, name: "status" });
 
@@ -369,46 +387,90 @@ export function TaskDialog({
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="task-daily-limit">Daily global limit</Label>
-              <Input
-                id="task-daily-limit"
-                type="number"
-                min="1"
-                step="1"
-                placeholder="Unlimited"
-                {...register("daily_limit")}
-              />
-              <p className="text-xs text-muted-foreground">
-                Leave empty for no daily cap.
-              </p>
-              {errors.daily_limit && (
-                <p className="text-xs text-destructive">
-                  {errors.daily_limit.message}
+            {!fixedMode && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="task-daily-limit">Daily global limit</Label>
+                  <Input
+                    id="task-daily-limit"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Unlimited"
+                    {...register("daily_limit")}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty for no daily cap.
+                  </p>
+                  {errors.daily_limit && (
+                    <p className="text-xs text-destructive">
+                      {errors.daily_limit.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="task-per-user-limit">Per-user limit</Label>
+                  <Input
+                    id="task-per-user-limit"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Unlimited"
+                    {...register("per_user_limit")}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Max reviews each user may submit per day (Asia/Dhaka).
+                    Resets at midnight. Leave empty for no per-user cap.
+                  </p>
+                  {errors.per_user_limit && (
+                    <p className="text-xs text-destructive">
+                      {errors.per_user_limit.message}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3 sm:col-span-2">
+              <div>
+                <p className="text-sm font-medium">Fixed users only</p>
+                <p className="text-xs text-muted-foreground">
+                  Hide this task from everyone except the users you pick, each
+                  with their own daily limit.
                 </p>
-              )}
+              </div>
+              <Switch
+                checked={fixedMode === true}
+                onCheckedChange={(checked) =>
+                  setValue("fixed_user_mode", checked, { shouldDirty: true })
+                }
+                aria-label="Fixed users only"
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="task-per-user-limit">Per-user limit</Label>
-              <Input
-                id="task-per-user-limit"
-                type="number"
-                min="1"
-                step="1"
-                placeholder="Unlimited"
-                {...register("per_user_limit")}
-              />
-              <p className="text-xs text-muted-foreground">
-                Max reviews each user may submit per day (Asia/Dhaka). Resets
-                at midnight. Leave empty for no per-user cap.
-              </p>
-              {errors.per_user_limit && (
-                <p className="text-xs text-destructive">
-                  {errors.per_user_limit.message}
-                </p>
-              )}
-            </div>
+            {fixedMode && (
+              <div className="sm:col-span-2">
+                <FixedUsersField
+                  value={(fixedUsers ?? []).map((entry) => {
+                    const withLabel = entry as FixedUserEntry;
+                    return {
+                      user_id: withLabel.user_id,
+                      daily_limit: Number(withLabel.daily_limit) || 1,
+                      label: withLabel.label,
+                    };
+                  })}
+                  onChange={(next) =>
+                    setValue("fixed_users", next, { shouldDirty: true })
+                  }
+                  error={
+                    typeof errors.fixed_users?.message === "string"
+                      ? errors.fixed_users.message
+                      : undefined
+                  }
+                />
+              </div>
+            )}
 
             <div className="space-y-2 sm:col-span-2">
               <Label>Review source</Label>
