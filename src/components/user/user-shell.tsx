@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -107,6 +108,19 @@ export function UserShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { data } = useProfile();
   const profile = data?.profile;
+
+  // Access test is mandatory for every new user — never let them stay on the
+  // dashboard without passing it (client-side backstop for the middleware).
+  useEffect(() => {
+    if (
+      profile &&
+      profile.role !== "admin" &&
+      !profile.access_test_passed &&
+      pathname !== "/access-test"
+    ) {
+      router.replace("/access-test");
+    }
+  }, [profile, pathname, router]);
 
   return (
     <div className="min-h-dvh bg-background">

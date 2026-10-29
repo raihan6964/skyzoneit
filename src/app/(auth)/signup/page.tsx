@@ -44,7 +44,8 @@ export default function SignupPage() {
 
     if (data.session) {
       toast.success("Account created — welcome to Skyzone IT!");
-      router.replace("/dashboard");
+      // New users must pass the access test before reaching the dashboard.
+      router.replace("/access-test");
       router.refresh();
       return;
     }
