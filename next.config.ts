@@ -28,6 +28,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "i.imgur.com" },
       { protocol: "https", hostname: "play-lh.googleusercontent.com" },
       { protocol: "https", hostname: "is1-ssl.mzstatic.com" },
+      // Supabase Storage public URLs for uploaded review screenshots/banners.
+      { protocol: "https", hostname: "**.supabase.co" },
+      { protocol: "https", hostname: "**.supabase.in" },
     ],
   },
 };

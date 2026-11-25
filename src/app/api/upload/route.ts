@@ -1,6 +1,6 @@
 import { withApi, requireUser } from "@/lib/api";
 import { ApiError } from "@/lib/error";
-import { uploadImageToImgbb } from "@/lib/imgbb";
+import { uploadImage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString("base64");
-    const url = await uploadImageToImgbb(
+    const url = await uploadImage(
       base64,
       file.name?.replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 50) || "upload"
     );

@@ -22,6 +22,12 @@ export async function uploadImageToImgbb(
   });
 
   if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    console.error(
+      "[imgbb] upload rejected:",
+      response.status,
+      detail.slice(0, 500)
+    );
     throw new ApiError("Image upload failed", 502);
   }
 
@@ -29,6 +35,9 @@ export async function uploadImageToImgbb(
     data?: { display_url?: string; url?: string };
   };
   const url = json.data?.display_url || json.data?.url;
-  if (!url) throw new ApiError("Image upload failed", 502);
+  if (!url) {
+    console.error("[imgbb] upload returned no URL:", JSON.stringify(json).slice(0, 500));
+    throw new ApiError("Image upload failed", 502);
+  }
   return url;
 }

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { withApi, requireUser, unwrap } from "@/lib/api";
 import { ApiError } from "@/lib/error";
-import { uploadImageToImgbb } from "@/lib/imgbb";
+import { uploadImage } from "@/lib/storage";
 import { scheduleApprovalCycle } from "@/lib/autoapprove";
 import { submissionSchema } from "@/lib/validations";
 import type { Submission } from "@/lib/types";
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       throw new ApiError("Screenshot must be smaller than 5MB");
     }
 
-    const screenshotUrl = await uploadImageToImgbb(
+    const screenshotUrl = await uploadImage(
       imageBase64,
       `review-${profile.sky_id}-${Date.now()}`
     );
